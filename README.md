@@ -29,6 +29,16 @@ be used.
 3. That's it! You can change the other parameters around if you'd like, but it
    is far from necessary. Enjoy your dynamic cards!
 
+### Hotkeys
+
+During use, it is possible that Mistral AI's LLM might output some bad results.
+This can be especially drastic with cards featuring little text. You can use
+the following buttons to fix this:
+
+* `;`: Clear all AI rewordings of the current card.
+* `'`: Clear all AI rewordings of all cards.
+* `E`: Opening the editor will act as if `;` was pressed out of necessity.
+
 ### Config file reference
 
 A brief explanation of config file options.

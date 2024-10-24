@@ -47,11 +47,16 @@ class KeyPressCacheClearFilter(QObject):
                 if curr_card is not None and curr_card.id in cache.data.keys():
                     clear_card_from_cache(curr_card)
                     mw.reviewer._redraw_current_card()
+                else:
+                    tooltip('No card to clear from dynamic cache.')
                 return True
             elif key == Qt.Key.Key_Apostrophe:
-                clear_cache()
-                if mw.reviewer.card is not None:
-                    mw.reviewer._redraw_current_card()
+                if cache.data:
+                    clear_cache()
+                    if mw.reviewer.card is not None:
+                        mw.reviewer._redraw_current_card()
+                else:
+                    tooltip('No dynamic cache to clear.')
                 return True
         return super().eventFilter(obj, event)
 
@@ -101,24 +106,24 @@ def randint_try_norepeat(a, b, last_draw):
 # Clear cache, either entirely or for a specific card.
 def clear_card_from_cache(card: Card):
     if card is not None and card.id in cache.data.keys():
-        # print(f'Clearing card {card.id} from cache')
+        tooltip(f'Cleared card {card.id} from dynamic cache.')
         del cache.data[card.id]
 
 def clear_note_from_cache(note: Note):
     if note is not None:
-        # print(f'Clearing cache for cards associated with note {note.id}')
         for card in note.cards():
             clear_card_from_cache(card)
+        tooltip(f'Cleared dynamic cache for cards associated with note {note.id}.')
 
 def clear_cache():
-    # print('Clearing the entire cache')
     cache.data = {}
+    tooltip('Cleared dynamic cache.')
 
-# Redraw the current card when you clear the note from the cache so the user knows.
+# No need to redraw the card since that will be done anyway when the editor closes
 def clear_cache_on_editor_load_note(e: Editor):
     clear_note_from_cache(e.note)
-    if mw.reviewer.card is not None:
-        mw.reviewer._redraw_current_card()
+    # if mw.reviewer.card is not None:
+    #     mw.reviewer._redraw_current_card()
 
 def reword_card_mistral(curr_qtext):
     try:

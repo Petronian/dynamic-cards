@@ -1,6 +1,6 @@
 from typing import Collection, Optional
 from aqt import QEvent, QObject, Qt, mw, gui_hooks
-from aqt.editor import Editor
+from aqt.editor import Editor, EditorMode
 from aqt.operations import QueryOp
 from aqt.utils import tooltip
 from anki.cards import Card
@@ -120,10 +120,10 @@ def clear_cache():
     tooltip('Cleared dynamic cache.')
 
 # No need to redraw the card since that will be done anyway when the editor closes
-# Only clear cache when editing new cards (only ADD_CARDS or EDIT_CURRENT modes exist,
+# Only clear cache when editing new cards (only ADD_CARDS, EDIT_CURRENT, and BROWSER modes exist,
 # see Editor class)
 def clear_cache_on_editor_load_note(e: Editor):
-    if not e.addMode:
+    if e.editorMode == EditorMode.EDIT_CURRENT:
         clear_note_from_cache(e.note)
     # if mw.reviewer.card is not None:
     #     mw.reviewer._redraw_current_card()

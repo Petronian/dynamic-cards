@@ -120,8 +120,11 @@ def clear_cache():
     tooltip('Cleared dynamic cache.')
 
 # No need to redraw the card since that will be done anyway when the editor closes
+# Only clear cache when editing new cards (only ADD_CARDS or EDIT_CURRENT modes exist,
+# see Editor class)
 def clear_cache_on_editor_load_note(e: Editor):
-    clear_note_from_cache(e.note)
+    if not e.addMode:
+        clear_note_from_cache(e.note)
     # if mw.reviewer.card is not None:
     #     mw.reviewer._redraw_current_card()
 

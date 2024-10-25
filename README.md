@@ -7,8 +7,9 @@ each time you review them.
 
 ## Download and installation
 
-To be done. Until I release this, I'll be showing people how to do this in
-person.
+Head over to the [AnkiWeb page](https://ankiweb.net/shared/info/1902186394)
+for installation instructions. You should be able to install the plugin
+through the *Add-ons > Get Add-ons* menu in Anki itself.
 
 ## Usage
 
@@ -26,8 +27,15 @@ be used.
    **Config**. Paste your API key into the space corresponding to the `api_key`
    entry, keeping the quotes; your answer should overwrite the placeholder value
    of `"MISTRAL_API_KEY"`.
-3. That's it! You can change the other parameters around if you'd like, but it
+3. **Restart Anki.**
+4. That's it! You can change the other parameters around if you'd like, but it
    is far from necessary. Enjoy your dynamic cards!
+
+> [!IMPORTANT]
+> If you see a tooltip (pop-up) saying 'Unauthorized', there is a problem with your API key. Please try again or raise an issue on Github (see **Bugs and other issues**) if that doesn't work.
+
+> [!WARNING]
+> This extension might not work with certain types of cards, but should work with Basic, Cloze, and other card types that have the question text in their first field. This has been tested on AnKing and Miledown decks, for instance. Please raise an issue if you find a bug; see **Bugs and other issues** as well as **Config file reference** below.
 
 ### Hotkeys
 
@@ -38,6 +46,8 @@ the following buttons to fix this:
 * `;`: Clear all AI rewordings of the current card.
 * `'`: Clear all AI rewordings of all cards.
 * `E`: Opening the editor will act as if `;` was pressed out of necessity.
+
+Closing the study session (i.e., returning to the 'Decks' screen) will also act as if `;` was pressed.
 
 ### Config file reference
 
@@ -51,15 +61,6 @@ A brief explanation of config file options.
 | `model` | The Mistral AI model to use. Default is `mistral-large-latest`, which should behave well. | 
 | `exclude_note_types` | Note types to exclude from the Dynamic Cards plugin. For example, Image Occlusion cards have no text to change. |
 
-## Known issues
+## Bugs and other issues
 
-These are just issues that I know about. For a more comprehensive list, check the **GitHub** page. (Insert link)
-
-* **Review closing behavior:** If cards are being generated when the main
-  reviewer window is closed, items might still be added to the cache and
-  might persist. This shouldn't cause any major effects, so I've left it
-  alone.
-
-## Support
-
-To be done.
+Found a bug? Please raise an issue so I can see it! Contributions are also welcome.

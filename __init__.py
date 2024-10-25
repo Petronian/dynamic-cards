@@ -2,7 +2,7 @@ from typing import Collection, Optional
 from aqt import QEvent, QObject, Qt, mw, gui_hooks
 from aqt.editor import Editor, EditorMode
 from aqt.operations import QueryOp
-from aqt.utils import tooltip
+from aqt.utils import tooltip as tooltip_aqt
 from anki.cards import Card
 from anki.notes import Note
 from anki.template import TemplateRenderOutput
@@ -17,12 +17,18 @@ context = str(config['context'])
 api_key = str(config['api_key'])
 max_renders = config.get('max_renders', 3)
 exclude_note_types = config.get('exclude_note_types', [])
+debug = True
 
 # Pass by reference shim
 class Cache:
     data = {}
 
 cache = Cache()
+
+# Debug function declarations
+def tooltip(*args, **kwargs):
+    if debug: print(*args, **kwargs)
+    tooltip_aqt(*args, **kwargs)
 
 # Card entry format for use in the cache.
 class CachedCardEntry:
@@ -36,6 +42,10 @@ class CachedCardEntry:
         self.last_used_render = last_used_render
         self.renders = renders
         self.reps = reps
+
+    def __str__(self):
+        return (f'[Cached card {self.id}: {self.reps} recorded reps, last used render '
+                f'{self.last_used_render} (zero-indexed) of {len(self.renders)} total renders]')
 
 # Keypress event that will be used for removing faulty revisions of a card.
 class KeyPressCacheClearFilter(QObject):
@@ -76,15 +86,17 @@ def update_cached_card(card: Card,
     # Set card intrinsic props.
     # cce id should match card id already.
     cce.reps = card.reps
+    if debug: print(f'Updated reps for card {card.id}:', str(cce))
 
     # Set card extrinsic props.
     if new_render is not None:
         cce.renders += [new_render]
+        if debug: print(f'Added render for card {card.id}:', str(cce))
     if last_used_render is not None:
         assert last_used_render >= 0 and last_used_render < len(cce.renders)
         cce.last_used_render = last_used_render
+        if debug: print(f'Updated last used render for card {card.id}:', str(cce))
 
-    # print('Updating card ID ' + str(card.id) + ' to have ' + str(len(cce.renders)) + ' renders, last used: ' + str(cce.last_used_render))
     cache.data[card.id] = cce
     return cce
 
@@ -94,7 +106,9 @@ def create_new_cached_render(card: Card):
     ord = card.ord
     note = card.note()
     note = Note(col=note.col, id=note.id)
+    if debug: print(f'Creating new render for card {card.id} using model \'{model}\'')
     note.fields[0] = reword_card_mistral(note.fields[0])
+    if debug: print(f'Successfully created new render for card {card.id} using model \'{model}\'')
     return note.ephemeral_card(ord=ord, custom_note_type=note.note_type(), custom_template=card.template()).render_output()
 
 def randint_try_norepeat(a, b, last_draw):
@@ -170,17 +184,14 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
         # BUG: Will freeze card updates if it is undone multiple times in one "undo chain."
         # Eventually this will be fixed, or the user can clear the cache on a card manually.
         # This issue should not occur in everyday usage though.
-        if cce.reps >= card.reps:
-            # Use the last render.
-            # print('Currently using render: %d of %d (at this time; unchanged)' % (cce.last_used_render + 1, len(cce.renders)))
-            curr_render = cce.renders[cce.last_used_render]
-        else:
+        if cce.reps <= card.reps:
             # Otherwise, make a new request in the background and set the new render to use.
             if len(cce.renders) < max_renders and card.note().note_type()['name'] not in exclude_note_types:
+                if debug: print(f'Creating new render for card {card.id}, current cache: ', str(cce))
                 op = QueryOp(parent=mw,
                              op=lambda col: create_new_cached_render(card=card),
                              success=lambda render_output: update_cached_card(card, new_render=render_output))
-                op.failure(failure=lambda e: tooltip(str(e)))
+                op = op.failure(failure=lambda e: tooltip(str(e)))
                 op.run_in_background()
             randint_fn = randint_try_norepeat if max_renders > 1 else lambda a, b, c: 0
             cce.last_used_render = randint_fn(0, len(cce.renders) - 1, cce.last_used_render)
@@ -189,6 +200,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
         # Set the current render.
         curr_render = cce.renders[cce.last_used_render]
         card.set_render_output(curr_render)
+        if debug: print(f'Using render {cce.last_used_render} for card {card.id}')
         
         # Update the cache; at this time, just updating the number of reps.
         update_cached_card(card)

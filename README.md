@@ -45,9 +45,9 @@ the following buttons to fix this:
 
 * `;`: Clear all AI rewordings of the current card.
 * `'`: Clear all AI rewordings of all cards.
-* `E`: Opening the editor will act as if `;` was pressed out of necessity.
+* `E`: Opening the editor will act as if `;` were pressed out of necessity.
 
-Closing the study session (i.e., returning to the 'Decks' screen) will also act as if `;` was pressed.
+Closing the study session (i.e., returning to the 'Decks' screen) will also act as if `;` were pressed.
 
 ### Config file reference
 

@@ -79,19 +79,20 @@ def poll_cached_card(card: Card) -> CachedCardEntry:
     return cache.data[card.id]
 
 def update_cached_card(card: Card,
+                       reps: Optional[int] = None,
                        last_used_render: Optional[int] = None,
                        new_render: Optional[TemplateRenderOutput] = None) -> CachedCardEntry:
-    cce = poll_cached_card(card)
     
     # Set card intrinsic props.
-    # cce id should match card id already.
-    cce.reps = card.reps
-    if debug: print(f'Updated reps for card {card.id}:', str(cce))
+    cce = poll_cached_card(card)
 
-    # Set card extrinsic props.
+    if reps is not None:
+        # cce id should match card id already.
+        cce.reps = reps
+        if debug: print(f'Updated reps for card {card.id}:', str(cce))
     if new_render is not None:
         cce.renders += [new_render]
-        if debug: print(f'Added render for card {card.id}:', str(cce))
+        if debug: print(f'Added render for card {card.iFalsed}:', str(cce))
     if last_used_render is not None:
         assert last_used_render >= 0 and last_used_render < len(cce.renders)
         cce.last_used_render = last_used_render
@@ -177,14 +178,13 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
         # and then the scheduling will be assigned to the stored card in memory.
 
         # Poll the cached card.
+        # This will set the number of reps of any new card to 0.
         cce = poll_cached_card(card)
         # print('Last used render: %d of %d (at that time)' % (cce.last_used_render + 1, len(cce.renders)))
 
         # If the rep state hasn't changed since last time, then use the last render. Don't change.
-        # BUG: Will freeze card updates if it is undone multiple times in one "undo chain."
-        # Eventually this will be fixed, or the user can clear the cache on a card manually.
-        # This issue should not occur in everyday usage though.
         if cce.reps <= card.reps:
+
             # Otherwise, make a new request in the background and set the new render to use.
             if len(cce.renders) < max_renders and card.note().note_type()['name'] not in exclude_note_types:
                 if debug: print(f'Creating new render for card {card.id}, current cache: ', str(cce))
@@ -195,15 +195,17 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
                 op.run_in_background()
             randint_fn = randint_try_norepeat if max_renders > 1 else lambda a, b, c: 0
             cce.last_used_render = randint_fn(0, len(cce.renders) - 1, cce.last_used_render)
-            # print('Currently using render: %d of %d (at this time)' % (cce.last_used_render + 1, len(cce.renders)))
+
+            # Update the cache reps.
+            # BUG: Will freeze card updates if it is undone multiple times in one "undo chain."
+            # Eventually this will be fixed, or the user can clear the cache on a card manually.
+            # This issue should not occur in everyday usage though.
+            update_cached_card(card, reps=cce.reps+1)
 
         # Set the current render.
         curr_render = cce.renders[cce.last_used_render]
         card.set_render_output(curr_render)
         if debug: print(f'Using render {cce.last_used_render} for card {card.id}')
-        
-        # Update the cache; at this time, just updating the number of reps.
-        update_cached_card(card)
 
         # print(cce)
         return card.question()

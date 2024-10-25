@@ -17,11 +17,7 @@ context = str(config['context'])
 api_key = str(config['api_key'])
 max_renders = config.get('max_renders', 3)
 exclude_note_types = config.get('exclude_note_types', [])
-<<<<<<< HEAD
 debug = False
-=======
-debug = True
->>>>>>> 203bf4b68343f3e55e79423e37ac2f387544f811
 
 # Pass by reference shim
 class Cache:

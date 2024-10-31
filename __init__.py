@@ -18,6 +18,7 @@ api_key = str(config['api_key'])
 max_renders = config.get('max_renders', 3)
 exclude_note_types = config.get('exclude_note_types', [])
 debug = False
+pause = False # Note that cache clear keypresses will continue to work
 
 # Pass by reference shim
 class Cache:
@@ -56,18 +57,28 @@ class KeyPressCacheClearFilter(QObject):
                 curr_card = mw.reviewer.card
                 if curr_card is not None and curr_card.id in cache.data.keys():
                     clear_card_from_cache(curr_card)
-                    mw.reviewer._redraw_current_card()
                 else:
                     tooltip('No card to clear from dynamic cache.')
+                # Fix bug: hitting any cache clear keys should trigger a redraw in case card isn't drawing right
+                if mw.reviewer.card is not None:
+                    mw.reviewer._redraw_current_card()
                 return True
             elif key == Qt.Key.Key_Apostrophe:
                 if cache.data:
                     clear_cache()
-                    if mw.reviewer.card is not None:
-                        mw.reviewer._redraw_current_card()
                 else:
                     tooltip('No dynamic cache to clear.')
+                # Fix bug: hitting any cache clear keys should trigger a redraw in case card isn't drawing right
+                if mw.reviewer.card is not None:
+                    mw.reviewer._redraw_current_card()
                 return True
+            elif key == Qt.Key.Key_P:
+                pause = not pause
+                if pause:
+                    tooltip('Dynamic cards paused; will resume on Anki restart or unpause.')
+                else:
+                    tooltip('Dynamic cards unpaused.')
+
         return super().eventFilter(obj, event)
 
 def poll_cached_card(card: Card) -> CachedCardEntry:
@@ -92,7 +103,7 @@ def update_cached_card(card: Card,
         if debug: print(f'Updated reps for card {card.id}:', str(cce))
     if new_render is not None:
         cce.renders += [new_render]
-        if debug: print(f'Added render for card {card.iFalsed}:', str(cce))
+        if debug: print(f'Added render for card {card.id}:', str(cce))
     if last_used_render is not None:
         assert last_used_render >= 0 and last_used_render < len(cce.renders)
         cce.last_used_render = last_used_render
@@ -167,6 +178,10 @@ def reword_card_mistral(curr_qtext):
 
 # Based on the template used in the note, generate a rewording and rerender the front cloze.
 def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
+
+    # If pause, ignore everything.
+    if pause:
+        return text
 
     # Although this entire hook is called each time, we only want to modify the ephemeral card when we view
     # the question side. Then, we can simply view the answer side of the modified card while it's stored

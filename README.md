@@ -45,6 +45,8 @@ the following buttons to fix this:
 
 * `;`: Clear all AI rewordings of the current card.
 * `'`: Clear all AI rewordings of all cards.
+* `P`: Pause the generation of new dynamic cards (for example, if you're hitting API rate limits).
+       Press `P` again to resume generation of dynamic cards.
 * `E`: Opening the editor will act as if `;` were pressed out of necessity.
 
 Closing the study session (i.e., returning to the 'Decks' screen) will also act as if `;` were pressed.

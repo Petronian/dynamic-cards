@@ -18,12 +18,11 @@ api_key = str(config['api_key'])
 max_renders = config.get('max_renders', 3)
 exclude_note_types = config.get('exclude_note_types', [])
 debug = False
-pause = False # This only pauses NEW dynamic card generation
-
 
 # Pass by reference shim
 class Cache:
     data = {}
+    pause = False # This only pauses NEW dynamic card generation
 
 cache = Cache()
 
@@ -74,8 +73,8 @@ class KeyPressCacheClearFilter(QObject):
                     mw.reviewer._redraw_current_card()
                 return True
             elif key == Qt.Key.Key_P:
-                pause = not pause
-                if pause:
+                cache.pause = not cache.pause
+                if cache.pause:
                     tooltip('Dynamic card generation paused; will resume on Anki restart or unpause. '
                             'Existing dynamic cards will still show.')
                 else:
@@ -199,7 +198,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
         if cce.reps <= card.reps:
 
             # Otherwise, make a new request in the background and set the new render to use.
-            if (not pause and len(cce.renders) < max_renders and 
+            if (not cache.pause and len(cce.renders) < max_renders and 
                 card.note().note_type()['name'] not in exclude_note_types):
 
                 if debug: print(f'Creating new render for card {card.id}, current cache: ', str(cce))

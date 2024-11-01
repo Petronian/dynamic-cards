@@ -18,7 +18,8 @@ api_key = str(config['api_key'])
 max_renders = config.get('max_renders', 3)
 exclude_note_types = config.get('exclude_note_types', [])
 debug = False
-pause = False # Note that cache clear keypresses will continue to work
+pause = False # This only pauses NEW dynamic card generation
+
 
 # Pass by reference shim
 class Cache:
@@ -75,9 +76,10 @@ class KeyPressCacheClearFilter(QObject):
             elif key == Qt.Key.Key_P:
                 pause = not pause
                 if pause:
-                    tooltip('Dynamic cards paused; will resume on Anki restart or unpause.')
+                    tooltip('Dynamic card generation paused; will resume on Anki restart or unpause. '
+                            'Existing dynamic cards will still show.')
                 else:
-                    tooltip('Dynamic cards unpaused.')
+                    tooltip('Dynamic card generation unpaused.')
 
         return super().eventFilter(obj, event)
 
@@ -179,10 +181,6 @@ def reword_card_mistral(curr_qtext):
 # Based on the template used in the note, generate a rewording and rerender the front cloze.
 def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
 
-    # If pause, ignore everything.
-    if pause:
-        return text
-
     # Although this entire hook is called each time, we only want to modify the ephemeral card when we view
     # the question side. Then, we can simply view the answer side of the modified card while it's stored
     # in the mw.reviewer.card slot, even though we call the hook again.
@@ -201,7 +199,9 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
         if cce.reps <= card.reps:
 
             # Otherwise, make a new request in the background and set the new render to use.
-            if len(cce.renders) < max_renders and card.note().note_type()['name'] not in exclude_note_types:
+            if (not pause and len(cce.renders) < max_renders and 
+                card.note().note_type()['name'] not in exclude_note_types):
+
                 if debug: print(f'Creating new render for card {card.id}, current cache: ', str(cce))
                 op = QueryOp(parent=mw,
                              op=lambda col: create_new_cached_render(card=card),

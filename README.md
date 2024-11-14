@@ -33,7 +33,8 @@ be used.
    of `"MISTRAL_API_KEY"`.
 3. **Restart Anki.**
 4. That's it! You can change the other parameters around if you'd like, but it
-   is far from necessary. Enjoy your dynamic cards!
+   is far from necessary. **The plugin should begin working immediately without further action;
+   changes will initially be subtle. Enjoy your dynamic cards!**
 
 > [!IMPORTANT]
 > If you see a tooltip (pop-up) saying 'Unauthorized', there is a problem with your API key. Please try again or raise an issue on Github (see **Bugs and other issues**) if that doesn't work.

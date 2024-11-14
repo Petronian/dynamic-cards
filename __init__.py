@@ -1,5 +1,6 @@
 from typing import Collection, Optional
 from aqt import QEvent, QObject, Qt, mw, gui_hooks
+from aqt.qt import QWidget
 from aqt.editor import Editor, EditorMode
 from aqt.operations import QueryOp
 from aqt.utils import tooltip as tooltip_aqt
@@ -81,6 +82,17 @@ class KeyPressCacheClearFilter(QObject):
                     tooltip('Dynamic card generation unpaused.')
 
         return super().eventFilter(obj, event)
+
+# Create an options window.
+# The options here will be:
+# API Key (label)
+# Context (paragraph)
+# Max renders (number)
+# Excluding note types (+/- table)
+# Button keybinds for clearing card and whole cache (labels)
+# Also: for above, will add those options to the reviewer context menu
+class DynamicCardsOptionsWindow(QWidget):
+    pass
 
 def poll_cached_card(card: Card) -> CachedCardEntry:
     if card.id not in cache.data.keys():

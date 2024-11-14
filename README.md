@@ -5,6 +5,10 @@ content? Introducing the **Dynamic Cards** plugin, a small plugin
 that allows Anki to ping LLMs to slightly change the content of your cards
 each time you review them.
 
+This extension currently relies solely upon **Mistral AI** for generating and
+serving new content; please note that your cards will be used as training
+data if you use Mistral's free tier for your API key.
+
 ## Download and installation
 
 Head over to the [AnkiWeb page](https://ankiweb.net/shared/info/1902186394)
@@ -29,7 +33,8 @@ be used.
    of `"MISTRAL_API_KEY"`.
 3. **Restart Anki.**
 4. That's it! You can change the other parameters around if you'd like, but it
-   is far from necessary. Enjoy your dynamic cards!
+   is far from necessary. **The plugin should begin working immediately without further action;
+   changes will initially be subtle. Enjoy your dynamic cards!**
 
 > [!IMPORTANT]
 > If you see a tooltip (pop-up) saying 'Unauthorized', there is a problem with your API key. Please try again or raise an issue on Github (see **Bugs and other issues**) if that doesn't work.

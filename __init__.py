@@ -1,6 +1,6 @@
 from typing import Collection, Optional
 from aqt import QEvent, QObject, Qt, mw, gui_hooks
-from aqt.qt import QWidget
+from aqt.qt import QWidget, QAction, QDialog
 from aqt.editor import Editor, EditorMode
 from aqt.operations import QueryOp
 from aqt.utils import tooltip as tooltip_aqt
@@ -91,8 +91,19 @@ class KeyPressCacheClearFilter(QObject):
 # Excluding note types (+/- table)
 # Button keybinds for clearing card and whole cache (labels)
 # Also: for above, will add those options to the reviewer context menu
-class DynamicCardsOptionsWindow(QWidget):
-    pass
+
+# Have the dialog and the settings menu in separate classes.
+class DynamicCardsDialog(QDialog):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setWindowTitle('Dyamic Cards Settings')
+        self.exec()
+
+# Add to the test options stuff.
+config_option = QAction("Dynamic Cards", mw)
+config_option.triggered.connect(lambda: DynamicCardsDialog(parent=mw))
+mw.form.menuTools.addAction(config_option)
 
 def poll_cached_card(card: Card) -> CachedCardEntry:
     if card.id not in cache.data.keys():

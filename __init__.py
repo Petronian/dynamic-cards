@@ -1,6 +1,6 @@
-from typing import Collection, Optional
+from typing import Callable, Collection, Optional, Sequence, Tuple
 from aqt import QEvent, QObject, Qt, mw, gui_hooks, QMenu
-from aqt.qt import QWidget, QAction, QDialog, qconnect
+from aqt.qt import QWidget, QAction, QDialog, qconnect, QKeySequence, QKeyCombination, QApplication
 from aqt.editor import Editor, EditorMode
 from aqt.reviewer import Reviewer
 from aqt.operations import QueryOp
@@ -13,12 +13,12 @@ import requests
 import json
 
 # Local imports
-from .dialog import WelcomeDialog
+from .dialog import WelcomeDialog, SettingsDialog
 from .config import Config
 
-# Optional parameters use the .get method with a default value
+# Get configurations and set up the config object.
 config_dict = mw.addonManager.getConfig(__name__)
-config = Config(config_dict, debug = False)
+config = Config(mw.addonManager, __name__, debug = False)
 
 # Debug function declarations
 def tooltip(*args, **kwargs):
@@ -44,10 +44,11 @@ class CachedCardEntry:
 
 # Keypress event that will be used for removing faulty revisions of a card.
 class KeyPressCacheClearFilter(QObject):
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj: object, event: QEvent):
         if event.type() == QEvent.KeyPress:
-            key = event.key()
-            if key == Qt.Key.Key_Semicolon:
+            key_combination = event.keyCombination()
+            pressed_key = QKeySequence(key_combination).toString()
+            if pressed_key == config.settings.shortcut_clear_current_card:
                 curr_card = mw.reviewer.card
                 if curr_card is not None and curr_card.id in config.data.keys():
                     clear_card_from_cache(curr_card)
@@ -57,7 +58,7 @@ class KeyPressCacheClearFilter(QObject):
                 if mw.reviewer.card is not None:
                     mw.reviewer._redraw_current_card()
                 return True
-            elif key == Qt.Key.Key_Apostrophe:
+            elif pressed_key == config.settings.shortcut_clear_all_cards:
                 if config.data:
                     clear_cache()
                 else:
@@ -66,13 +67,16 @@ class KeyPressCacheClearFilter(QObject):
                 if mw.reviewer.card is not None:
                     mw.reviewer._redraw_current_card()
                 return True
-            elif key == Qt.Key.Key_P:
+            elif pressed_key == config.settings.shortcut_pause:
                 config.pause = not config.pause
                 if config.pause:
                     tooltip('Dynamic card generation paused; will resume on Anki restart or unpause. '
                             'Existing dynamic cards will still show.')
                 else:
                     tooltip('Dynamic card generation unpaused.')
+            elif pressed_key == config.settings.shortcut_include_exclude and mw.reviewer:
+                _, add_remove_fn = inject_dynamic_cards_options(mw.reviewer, None)
+                add_remove_fn()
 
         return super().eventFilter(obj, event)
 
@@ -85,18 +89,7 @@ class KeyPressCacheClearFilter(QObject):
 # Button keybinds for clearing card and whole cache (labels)
 # Also: for above, will add those options to the reviewer context menu
 
-# Have the dialog and the settings menu in separate classes.
-class DynamicCardsDialog(QDialog):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setWindowTitle('Dyamic Cards Settings')
-        self.exec()
-
-# Add to the test options stuff.
-config_option = QAction("Dynamic Cards", mw)
-config_option.triggered.connect(lambda: DynamicCardsDialog(parent=mw))
-mw.form.menuTools.addAction(config_option)
 
 def poll_cached_card(card: Card) -> CachedCardEntry:
     if card.id not in config.data.keys():
@@ -135,9 +128,9 @@ def create_new_cached_render(card: Card):
     ord = card.ord
     note = card.note()
     note = Note(col=note.col, id=note.id)
-    if config.debug: print(f'Creating new render for card {card.id} using model \'{config.model}\'')
+    if config.debug: print(f'Creating new render for card {card.id} using model \'{config.settings.model}\'')
     note.fields[0] = reword_card_mistral(note.fields[0])
-    if config.debug: print(f'Successfully created new render for card {card.id} using model \'{config.model}\'')
+    if config.debug: print(f'Successfully created new render for card {card.id} using model \'{config.settings.model}\'')
     return note.ephemeral_card(ord=ord, custom_note_type=note.note_type(), custom_template=card.template()).render_output()
 
 def randint_try_norepeat(a, b, last_draw):
@@ -176,10 +169,10 @@ def reword_card_mistral(curr_qtext):
         chat_response = requests.post(url="https://api.mistral.ai/v1/chat/completions",
                                       headers={'Content-Type': 'application/json',
                                               'Accept': 'application/json',
-                                              'Authorization': 'Bearer ' + config.api_key},
-                                      data=json.dumps({'model': config.model,
+                                              'Authorization': 'Bearer ' + config.settings.api_key},
+                                      data=json.dumps({'model': config.settings.model,
                                                        'messages': [
-                                                           {'role': 'system', 'content': config.context},
+                                                           {'role': 'system', 'content': config.settings.context},
                                                            {'role': 'user', 'content': curr_qtext}
                                                        ]}))
         
@@ -189,7 +182,7 @@ def reword_card_mistral(curr_qtext):
     except Exception as e:
         # Throw an error.
         # # print('Error with Mistral. Is your API key working?')
-        raise RuntimeError(f'Error loading \'{config.model}\' for dynamic Anki cards: ' + str(e))
+        raise RuntimeError(f'Error loading \'{config.settings.model}\' for dynamic Anki cards: ' + str(e))
                           # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
                           # 'If this continues, disable this add-on to stop these messages.')
 
@@ -214,8 +207,8 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
         if cce.reps <= card.reps:
 
             # Otherwise, make a new request in the background and set the new render to use.
-            if (not config.pause and len(cce.renders) < config.max_renders and 
-                card.note().note_type()['name'] not in config.exclude_note_types):
+            if (not config.pause and len(cce.renders) < config.settings.max_renders and 
+                card.note().note_type()['name'] not in config.settings.exclude_note_types):
 
                 if config.debug: print(f'Creating new render for card {card.id}, current cache: ', str(cce))
                 op = QueryOp(parent=mw,
@@ -223,7 +216,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
                              success=lambda render_output: update_cached_card(card, new_render=render_output))
                 op = op.failure(failure=lambda e: tooltip(str(e)))
                 op.run_in_background()
-            randint_fn = randint_try_norepeat if config.max_renders > 1 else lambda a, b, c: 0
+            randint_fn = randint_try_norepeat if config.settings.max_renders > 1 else lambda a, b, c: 0
             cce.last_used_render = randint_fn(0, len(cce.renders) - 1, cce.last_used_render)
 
             # Update the cache reps.
@@ -250,20 +243,29 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
 
 # Inject context menu option to add or remove current card type.
 
-def inject_dynamic_cards_options(r: Reviewer, m: QMenu) -> None:
+def inject_dynamic_cards_options(r: Reviewer, m: QMenu) -> Tuple[QAction, Callable]:
     # See L1026 in reviewer.py
-    m.addSeparator()
     curr_note_type = r.card.note().note_type()['name']
-    if curr_note_type not in config.exclude_note_types:
+    if curr_note_type not in config.settings.exclude_note_types:
         def exclude_curr_note_type():
-            config.exclude_note_types.append(curr_note_type)
+            # Assigning explicitly so the setting change gets written to disk since we are calling __setattr__
+            config.settings.exclude_note_types = config.settings.exclude_note_types + [curr_note_type]
             tooltip(f'Excluding note type \'{curr_note_type}\' from dynamic card generation.')
-        qconnect(m.addAction('Exclude current note type').triggered, exclude_curr_note_type)
+        phrase = 'Exclude current note type'
+        fn = exclude_curr_note_type
     else:
         def include_curr_note_type():
-            config.exclude_note_types = [x for x in config.exclude_note_types if x != curr_note_type]
+            config.settings.exclude_note_types = [x for x in config.settings.exclude_note_types if x != curr_note_type]
             tooltip(f'Including note type \'{curr_note_type}\' in dynamic card generation.')
-        qconnect(m.addAction('Include current note type').triggered, include_curr_note_type)
+        phrase = 'Include current note type'
+        fn = include_curr_note_type
+    a = None
+    if m:
+        m.addSeparator()
+        a = m.addAction(phrase)
+        a.setShortcut(config.settings.shortcut_include_exclude)
+        qconnect(a.triggered, fn)
+    return a, fn
 
 # Add hook using the new method
 # Also clear the reviewer once the review session is over
@@ -276,7 +278,35 @@ gui_hooks.reviewer_will_show_context_menu.append(inject_dynamic_cards_options)
 # Attach the remove revision tool.
 mw.installEventFilter(KeyPressCacheClearFilter(mw))
 
-# Make the welcome announcement.
-dlg = WelcomeDialog()
-dlg.setModal(True)
-dlg.show()
+# Make the welcome announcement if warranted.
+if config.settings.show_modal:
+    dlg = WelcomeDialog(config.settings.show_modal)
+    def set_show_modal():
+        config.settings.show_modal = dlg.form.checkBox.isChecked()
+    qconnect(dlg.rejected, set_show_modal)
+    dlg.setModal(True)
+    dlg.show()
+
+# Have the dialog and the settings menu in separate classes.
+sdlg = SettingsDialog(config.settings)
+def update_config_settings():
+    config.settings.shortcut_clear_current_card = sdlg.form.keySequenceEdit.keySequence().toString()
+    config.settings.shortcut_clear_all_cards = sdlg.form.keySequenceEdit_2.keySequence().toString()
+    config.settings.shortcut_include_exclude = sdlg.form.keySequenceEdit_3.keySequence().toString()
+    config.settings.shortcut_pause = sdlg.form.keySequenceEdit_4.keySequence().toString()
+    config.settings.api_key = sdlg.form.mistralAPIKeyLineEdit.text()
+    config.settings.model = sdlg.form.mistralModelLineEdit.text()
+    config.settings.context = sdlg.form.textEdit.toPlainText()
+    config.settings.clear_cache_on_reviewer_end = sdlg.form.checkBox.isChecked()
+    config.settings.exclude_note_types = [sdlg.form.listWidget.item(i).text() for i in range(sdlg.form.listWidget.count())]
+    try:
+        val = int(sdlg.form.maxRendersLineEdit.text())
+        assert val > 0
+        config.settings.max_renders = val
+    except ValueError or AssertionError:
+        tooltip(f'Invalid new value \'{sdlg.form.maxRendersLineEdit.text()}\' for max renders; reverting to old value.')
+sdlg.setModal(True)
+sdlg.accepted.connect(update_config_settings)
+config_option = QAction("Dynamic Cards", mw)
+config_option.triggered.connect(sdlg.show)
+mw.form.menuTools.addAction(config_option)

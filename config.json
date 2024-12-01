@@ -3,5 +3,11 @@
     "api_key": "MISTRAL_API_KEY",
     "context": "You are a program intended to rewrite Anki cards. Rewrite the following Anki card while not changing any of the cloze-deleted text, and do not say anything else besides the reworded card. Try and vary the sentence structure appreciably. Preserve HTML formatting; don't use Markdown.",
     "max_renders": 3,
-    "exclude_note_types": ["Image Occlusion Enhanced"]
+    "exclude_note_types": ["Image Occlusion Enhanced"],
+    "show_modal": true,
+    "shortcut_clear_current_card": ";",
+    "shortcut_clear_all_cards": "'",
+    "shortcut_pause": "P",
+    "shortcut_include_exclude": "L",
+    "clear_cache_on_reviewer_end": true
 }

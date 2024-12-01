@@ -75,21 +75,10 @@ class KeyPressCacheClearFilter(QObject):
                 else:
                     tooltip('Dynamic card generation unpaused.')
             elif pressed_key == config.settings.shortcut_include_exclude and mw.reviewer:
-                _, add_remove_fn = inject_dynamic_cards_options(mw.reviewer, None)
+                _, add_remove_fn = inject_include_exclude_option(mw.reviewer, None)
                 add_remove_fn()
 
         return super().eventFilter(obj, event)
-
-# Create an options window.
-# The options here will be:
-# API Key (label)
-# Context (paragraph)
-# Max renders (number)
-# Excluding note types (+/- table)
-# Button keybinds for clearing card and whole cache (labels)
-# Also: for above, will add those options to the reviewer context menu
-
-
 
 def poll_cached_card(card: Card) -> CachedCardEntry:
     if card.id not in config.data.keys():
@@ -243,7 +232,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
 
 # Inject context menu option to add or remove current card type.
 
-def inject_dynamic_cards_options(r: Reviewer, m: QMenu) -> Tuple[QAction, Callable]:
+def inject_include_exclude_option(r: Reviewer, m: QMenu) -> Tuple[QAction, Callable]:
     # See L1026 in reviewer.py
     curr_note_type = r.card.note().note_type()['name']
     if curr_note_type not in config.settings.exclude_note_types:
@@ -261,11 +250,33 @@ def inject_dynamic_cards_options(r: Reviewer, m: QMenu) -> Tuple[QAction, Callab
         fn = include_curr_note_type
     a = None
     if m:
-        m.addSeparator()
+        #m.addSeparator()
         a = m.addAction(phrase)
         a.setShortcut(config.settings.shortcut_include_exclude)
         qconnect(a.triggered, fn)
     return a, fn
+
+def inject_clear_current_card_option(r: Reviewer, m: QMenu) -> None:
+    a = m.addAction('Clear current card from cache')
+    a.setShortcut(config.settings.shortcut_clear_current_card)
+    if mw.reviewer:
+        def fn(): clear_card_from_cache(mw.reviewer.card)
+        qconnect(a.triggered, fn)
+
+def inject_clear_all_cards_option(r: Reviewer, m: QMenu) -> None:
+    a = m.addAction('Clear all cards from cache')
+    a.setShortcut(config.settings.shortcut_clear_all_cards)
+    def fn(): clear_cache()
+    qconnect(a.triggered, fn)
+    
+def inject_pause_generation_option(r: Reviewer, m: QMenu) -> None:
+    a = m.addAction('Pause dynamic card generation' if not config.pause else 'Resume dynamic card generation')
+    a.setShortcut(config.settings.shortcut_pause)
+    def fn(): config.pause = not config.pause
+    qconnect(a.triggered, fn)
+
+def insert_separator(r: Reviewer, m: QMenu) -> None:
+    m.addSeparator()
 
 # Add hook using the new method
 # Also clear the reviewer once the review session is over
@@ -273,7 +284,11 @@ def inject_dynamic_cards_options(r: Reviewer, m: QMenu) -> Tuple[QAction, Callab
 gui_hooks.card_will_show.append(inject_rewording_on_question)
 gui_hooks.reviewer_will_end.append(clear_cache)
 gui_hooks.editor_did_load_note.append(clear_cache_on_editor_load_note)
-gui_hooks.reviewer_will_show_context_menu.append(inject_dynamic_cards_options)
+gui_hooks.reviewer_will_show_context_menu.append(insert_separator)
+gui_hooks.reviewer_will_show_context_menu.append(inject_pause_generation_option)
+gui_hooks.reviewer_will_show_context_menu.append(inject_include_exclude_option)
+gui_hooks.reviewer_will_show_context_menu.append(inject_clear_current_card_option)
+gui_hooks.reviewer_will_show_context_menu.append(inject_clear_all_cards_option)
 
 # Attach the remove revision tool.
 mw.installEventFilter(KeyPressCacheClearFilter(mw))

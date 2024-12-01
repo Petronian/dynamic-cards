@@ -44,4 +44,4 @@ class Settings:
         config_keys = self.fetch_config().keys()
         config_new = {k: getattr(self, k) for k in config_keys}
         self._addon_manager.writeConfig(self._module_name, config_new)
-        print('Successfully wrote to configuration file')
+        #print('Successfully wrote to configuration file')

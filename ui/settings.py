@@ -28,16 +28,22 @@ class Ui_Dialog(object):
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.label = QLabel(self.verticalLayoutWidget)
         self.label.setObjectName(u"label")
-        font = QFont()
-        font.setPointSize(14)
-        font.setBold(True)
-        self.label.setFont(font)
 
         self.verticalLayout.addWidget(self.label)
 
         self.verticalSpacer = QSpacerItem(20, 5, QSizePolicy.Minimum, QSizePolicy.Fixed)
 
         self.verticalLayout.addItem(self.verticalSpacer)
+
+        self.label_5 = QLabel(self.verticalLayoutWidget)
+        self.label_5.setObjectName(u"label_5")
+        self.label_5.setOpenExternalLinks(True)
+
+        self.verticalLayout.addWidget(self.label_5)
+
+        self.verticalSpacer_6 = QSpacerItem(20, 5, QSizePolicy.Minimum, QSizePolicy.Fixed)
+
+        self.verticalLayout.addItem(self.verticalSpacer_6)
 
         self.label_3 = QLabel(self.verticalLayoutWidget)
         self.label_3.setObjectName(u"label_3")
@@ -223,8 +229,8 @@ class Ui_Dialog(object):
 
     # setupUi
     def retranslateUi(self, Dialog):
-        Dialog.setWindowTitle(QCoreApplication.translate("Dialog", u"Dialog", None))
-        self.label.setText(QCoreApplication.translate("Dialog", u"Dynamic Cards Settings", None))
+        Dialog.setWindowTitle(QCoreApplication.translate("Dialog", u"Dynamic Cards Settings", None))
+        self.label.setText(QCoreApplication.translate("Dialog", u"<h1>Dynamic Cards Settings</h1>", None))
         self.label_3.setText(QCoreApplication.translate("Dialog", u"<b>Keyboard Shortcuts</b>", None))
         self.clearCurrentCardFromCacheLabel.setText(QCoreApplication.translate("Dialog", u"Clear current card from cache", None))
         self.clearAllCardsFromCacheLabel.setText(QCoreApplication.translate("Dialog", u"Clear all cards from cache", None))
@@ -238,6 +244,7 @@ class Ui_Dialog(object):
         self.label_6.setText(QCoreApplication.translate("Dialog", u"<b>Review Behavior</b>", None))
         self.checkBox.setText(QCoreApplication.translate("Dialog", u"Clear cache on review end", None))
         self.label_4.setText(QCoreApplication.translate("Dialog", u"<b>Excluded Note Types</b> (double-click entry to remove)", None))
+        self.label_5.setText(QCoreApplication.translate("Dialog", u"<a href='https://github.com/Petronian/dynamic-cards'>Need usage instructions? Click here!</a>", None))
 
         __sortingEnabled = self.listWidget.isSortingEnabled()
         self.listWidget.setSortingEnabled(False)

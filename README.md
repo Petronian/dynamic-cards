@@ -60,9 +60,9 @@ number of rewordings are reached). The extension therefore operates as follows:
 * Upon subsequent reviews of a card, one of any of the previous rewordings
   (or a new rewording) may be selected for display.
 
-Do note that this is an LLM and is subject to mistakes; cards might not always
-look right. See **The Settings menu** subsection for what to do in order to
-remove a poor rewording of a card from memory.
+Do note that this extension uses an LLM and is subject to mistakes; cards might
+not always look right. See **The Settings menu** subsection for what to do in
+order to remove a poor rewording of a card from memory.
 
 ### The Settings menu
 

@@ -234,7 +234,7 @@ class Ui_Dialog(object):
         self.label_3.setText(QCoreApplication.translate("Dialog", u"<b>Keyboard Shortcuts</b>", None))
         self.clearCurrentCardFromCacheLabel.setText(QCoreApplication.translate("Dialog", u"Clear current card from cache", None))
         self.clearAllCardsFromCacheLabel.setText(QCoreApplication.translate("Dialog", u"Clear all cards from cache", None))
-        self.excludeUnexcludeCurrentCardTypeLabel.setText(QCoreApplication.translate("Dialog", u"Exclude/unexclude current card type", None))
+        self.excludeUnexcludeCurrentCardTypeLabel.setText(QCoreApplication.translate("Dialog", u"Exclude/include current note type", None))
         self.pauseDynamicCardGeneration.setText(QCoreApplication.translate("Dialog", u"Pause dynamic card generation", None))
         self.label_2.setText(QCoreApplication.translate("Dialog", u"<b>LLM Functionality</b>", None))
         self.maxRendersLabel.setText(QCoreApplication.translate("Dialog", u"Max renders", None))

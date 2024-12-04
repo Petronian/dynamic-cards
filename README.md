@@ -17,56 +17,52 @@ through the *Add-ons > Get Add-ons* menu in Anki itself.
 
 ## Usage
 
+### First-time setup
+
 There are some critical steps that need to be done before this extension may
 be used.
 
 1. **Create a Mistral API key:** Create a free account at
    [Mistral AI](https://console.mistral.ai/) to get started. Once created,
    navigate to the [API Keys](https://console.mistral.ai/api-keys/) page
-   and follow instructions to create a **free** API key. You should not need
-   to pay for this, but be aware that free accounts submit training data to
-   Mistral AI for use in training their models.
-2. **Paste the API key into the extension.** Navigate to the *Tools > Add-ons*
-   window in Anki. Then, select the **Dynamic Cards** extension and select
-   **Config**. Paste your API key into the space corresponding to the `api_key`
-   entry, keeping the quotes; your answer should overwrite the placeholder value
-   of `"MISTRAL_API_KEY"`.
-3. **Restart Anki.**
-4. That's it! You can change the other parameters around if you'd like, but it
-   is far from necessary. **The plugin should begin working immediately without further action;
+   and follow instructions to create a **free** API key.
+2. **Paste the API key into the extension.** Navigate to the *Tools > Dynamic Cards*
+   window in Anki. Then, paste your API key into the *Mistral API key* field.
+3. That's it! **The plugin should begin working immediately without further action;
    changes will initially be subtle. Enjoy your dynamic cards!**
 
 > [!IMPORTANT]
 > If you see a tooltip (pop-up) saying 'Unauthorized', there is a problem with your API key. Please try again or raise an issue on Github (see **Bugs and other issues**) if that doesn't work.
 
 > [!WARNING]
-> This extension might not work with certain types of cards, but should work with Basic, Cloze, and other card types that have the question text in their first field. This has been tested on AnKing and Miledown decks, for instance. Please raise an issue if you find a bug; see **Bugs and other issues** as well as **Config file reference** below.
+> This extension might not work with certain types of cards, but should work with Basic, Cloze, and other card types that have the question text in their first field. This has been tested on AnKing and Miledown decks, for instance. Please raise an issue if you find a bug; see **Bugs and other issues** below.
 
-### Hotkeys
+### The Settings menu
 
-During use, it is possible that Mistral AI's LLM might output some bad results.
-This can be especially drastic with cards featuring little text. You can use
-the following buttons to fix this:
+The Settings menu is the main control center of this plugin. It is accessible via *Tools > Dynamic Cards.* The below bulletpoints describe all current settings within the Settings menu.
 
-* `;`: Clear all AI rewordings of the current card.
-* `'`: Clear all AI rewordings of all cards.
-* `P`: Pause the generation of new dynamic cards (for example, if you're hitting API rate limits).
-       Press `P` again to resume generation of dynamic cards.
-* `E`: Opening the editor will act as if `;` were pressed out of necessity.
-
-Closing the study session (i.e., returning to the 'Decks' screen) will also act as if `;` were pressed.
-
-### Config file reference
-
-A brief explanation of config file options.
-
-| Key | Value |
-| --- | ----- |
-| `api_key` | Mistral AI API key. Instructions on obtaining one are above. |
-| `context` | Instructions fed to the LLM to generate rewordings for cards. If the model is misbehaving, try rewording the context to suit your needs. |
-| `max_renders` | The maximum number of alternative "versions" of a card to hold. The default is `3` to balance storage use with a healthy variety of cards. Increasing this will increase the number of rewordings of cards available to you. |
-| `model` | The Mistral AI model to use. Default is `mistral-large-latest`, which should behave well. | 
-| `exclude_note_types` | Note types to exclude from the Dynamic Cards plugin. For example, Image Occlusion cards have no text to change. |
+* **Clear current card from cache:** If the LLM outputs a card whose wording
+  doesn't quite make sense, press the corresponding hotkey to reset the
+  wording of that specific card.
+* **Clear all cards from cache:** Same as above, but do so for all cards.
+* **Exclude/include current note type:** If you come across a card during
+  your review whose note type is not amenable to dynamic generation (for example,
+  Image Occlusion cards do not often have text to reword), hit this
+  hotkey during your review to tell Dynamic Cards to not generate
+  unnecessary rewordings for this note type.
+* **Pause dynamic card generation:** Temporaeily stop the generation of
+  dynamic cards by pressing this hotkey during review. Press the hotkey
+  again to resume dynamic card generation.
+* **Mistral API key:** The API key to allow access to Mistral's API.
+* **Mistral model:** The Mistral model to use to generate card rewordings.
+* **Max renders:** The maximum number of alternative "versions" of a card to hold. The default is `3` to balance storage use with a healthy variety of cards. Increasing this will increase the number of rewordings of cards available to you.
+* **Context:** Instructions fed to the LLM to generate rewordings for cards. If the model is misbehaving, try rewording the context to suit your needs.
+* **Clear cache on review end:** By default, any card rewordings that
+  you create are cleared when you stop reviewing. Uncheck this option
+  to allow rewordings to persist until you close Anki.
+* **Excluded note types:** A list of all note types that have been excluded
+  so far. Double-click any note type to remove it from the list (and thus
+  resume dynamic generation again for it).
 
 ## Bugs and other issues
 

@@ -282,13 +282,14 @@ def insert_separator(r: Reviewer, m: QMenu) -> None:
 # Also clear the reviewer once the review session is over
 # Also clear cards from the cache when they are to be edited
 gui_hooks.card_will_show.append(inject_rewording_on_question)
-gui_hooks.reviewer_will_end.append(clear_cache)
 gui_hooks.editor_did_load_note.append(clear_cache_on_editor_load_note)
 gui_hooks.reviewer_will_show_context_menu.append(insert_separator)
 gui_hooks.reviewer_will_show_context_menu.append(inject_pause_generation_option)
 gui_hooks.reviewer_will_show_context_menu.append(inject_include_exclude_option)
 gui_hooks.reviewer_will_show_context_menu.append(inject_clear_current_card_option)
 gui_hooks.reviewer_will_show_context_menu.append(inject_clear_all_cards_option)
+if config.settings.clear_cache_on_reviewer_end:
+    gui_hooks.reviewer_will_end.append(clear_cache)
 
 # Attach the remove revision tool.
 mw.installEventFilter(KeyPressCacheClearFilter(mw))
@@ -314,12 +315,21 @@ def update_config_settings():
     config.settings.context = sdlg.form.textEdit.toPlainText()
     config.settings.clear_cache_on_reviewer_end = sdlg.form.checkBox.isChecked()
     config.settings.exclude_note_types = [sdlg.form.listWidget.item(i).text() for i in range(sdlg.form.listWidget.count())]
+
+    # Handle max render input
     try:
         val = int(sdlg.form.maxRendersLineEdit.text())
         assert val > 0
         config.settings.max_renders = val
     except ValueError or AssertionError:
         tooltip(f'Invalid new value \'{sdlg.form.maxRendersLineEdit.text()}\' for max renders; reverting to old value.')
+    
+    # Handle reviewer ending callback
+    # As per internal gui_hooks code, no exception thrown if object to remove not found
+    gui_hooks.reviewer_will_end.remove(clear_cache)
+    if config.settings.clear_cache_on_reviewer_end:
+        gui_hooks.reviewer_will_end.append(clear_cache)
+
 sdlg.setModal(True)
 sdlg.accepted.connect(update_config_settings)
 config_option = QAction("Dynamic Cards", mw)

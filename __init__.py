@@ -225,6 +225,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
     # Again, we don't need to do any kind of modification to the ephemeral card that's in mw.reviewer.card 
     # as long as the card is visible.
     elif kind == 'reviewAnswer':
+        # mw.reviewer.refresh_if_needed() 
         return card.answer()
     
     # If there is any unexpected value of kind, just display what's there.
@@ -290,6 +291,13 @@ gui_hooks.reviewer_will_show_context_menu.append(inject_clear_current_card_optio
 gui_hooks.reviewer_will_show_context_menu.append(inject_clear_all_cards_option)
 if config.settings.clear_cache_on_reviewer_end:
     gui_hooks.reviewer_will_end.append(clear_cache)
+
+# attempt to combat bug here: https://forums.ankiweb.net/t/bug-card-view-sometimes-doesnt-update/28450
+# This bug gets worse with this extension
+# Basically forcing the QWebEngine to show twice. Shifty approach; see if this actually reduces event frequency
+gui_hooks.reviewer_did_show_answer.append(lambda card: mw.reviewer.web.show()) 
+# Basically forcing web to evaluate twice; shifty approach that might break with updates. See reviewer.py L476
+# gui_hooks.reviewer_did_show_answer.append(lambda card: mw.reviewer.web.eval(f"_showAnswer({json.dumps(card.answer())});")) 
 
 # Attach the remove revision tool.
 mw.installEventFilter(KeyPressCacheClearFilter(mw))

@@ -11,6 +11,8 @@ from anki.template import TemplateRenderOutput
 from random import randint
 import requests
 import json
+import re
+import time
 
 # Local imports
 from .dialog import WelcomeDialog, SettingsDialog
@@ -118,7 +120,7 @@ def create_new_cached_render(card: Card):
     note = card.note()
     note = Note(col=note.col, id=note.id)
     if config.debug: print(f'Creating new render for card {card.id} using model \'{config.settings.model}\'')
-    note.fields[0] = reword_card_mistral(note.fields[0])
+    note.fields[0] = reword_card_mistral(card)
     if config.debug: print(f'Successfully created new render for card {card.id} using model \'{config.settings.model}\'')
     return note.ephemeral_card(ord=ord, custom_note_type=note.note_type(), custom_template=card.template()).render_output()
 
@@ -153,7 +155,31 @@ def clear_cache_on_editor_load_note(e: Editor):
     # if mw.reviewer.card is not None:
     #     mw.reviewer._redraw_current_card()
 
-def reword_card_mistral(curr_qtext):
+# Find all cloze matches of a given ord in a cloze card.
+# Case insensitive.
+def get_cloze_matches(curr_qtext, ord) -> list[str]:
+    pattern = r'{{c' + str(ord + 1) + r'.+?}}'
+    return re.findall(pattern, curr_qtext, flags=re.RegexFlag.IGNORECASE)
+
+# Ensure all cloze deletions are in curr_qtext.
+# Case insensitive.
+def validate_cloze_card(curr_qtext: str, cloze_deletions: list[Optional[str]]) -> bool:
+    for cloze_deletion in cloze_deletions:
+        if cloze_deletion.lower() not in curr_qtext.lower():
+            return False
+    return True
+
+def reword_card_mistral(curr_card: Card, num_tries=3) -> str: # ADD TO SETTINGS/CONFIG
+    # If we've run out of tries, then give up.
+    if num_tries < 0:
+        raise RuntimeError(f'Could not properly reword card {curr_card.id} after {num_tries} attempts.') 
+
+    # Extract relevant properties from the card.
+    curr_qtext = curr_card.note().fields[0]
+    curr_ord = curr_card.ord
+    curr_card_type = curr_card.note().note_type()['name']
+    
+    # Try to reword the card using Mistral.
     try:
         chat_response = requests.post(url="https://api.mistral.ai/v1/chat/completions",
                                       headers={'Content-Type': 'application/json',
@@ -164,16 +190,23 @@ def reword_card_mistral(curr_qtext):
                                                            {'role': 'system', 'content': config.settings.context},
                                                            {'role': 'user', 'content': curr_qtext}
                                                        ]}))
-        
         if not (chat_response.status_code >= 200 and chat_response.status_code < 300):
             raise requests.exceptions.RequestException(chat_response.json().get('message', 'Unspecified error'))
-        return chat_response.json()['choices'][0]['message']['content']
+        reworded_qtext = chat_response.json()['choices'][0]['message']['content']
     except Exception as e:
         # Throw an error.
         # # print('Error with Mistral. Is your API key working?')
         raise RuntimeError(f'Error loading \'{config.settings.model}\' for dynamic Anki cards: ' + str(e))
                           # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
                           # 'If this continues, disable this add-on to stop these messages.')
+    
+    # If the card is cloze-adjacent, then validate it. If valid, return the card.
+    # If not cloze-adjacent, skip this validation process and just return the card.
+    # BUG: This ONLY goes by name. There must be a better way to validate it.
+    if 'cloze' in curr_card_type.lower() and not validate_cloze_card(reworded_qtext, get_cloze_matches(curr_qtext, curr_ord)):
+        time.sleep(1) # avoid rate limit ceiling, CONSIDER ADDING TO SETTINGS/CONFIG
+        return reword_card_mistral(curr_card, num_tries - 1)
+    return reworded_qtext
 
 # Based on the template used in the note, generate a rewording and rerender the front cloze.
 def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:

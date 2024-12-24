@@ -169,10 +169,10 @@ def validate_cloze_card(curr_qtext: str, cloze_deletions: list[Optional[str]]) -
             return False
     return True
 
-def reword_card_mistral(curr_card: Card, num_tries=3) -> str: # ADD TO SETTINGS/CONFIG
+def reword_card_mistral(curr_card: Card, num_retries: int = config.settings.num_retries) -> str: 
     # If we've run out of tries, then give up.
-    if num_tries < 0:
-        raise RuntimeError(f'Could not properly reword card {curr_card.id} after {num_tries} attempts.') 
+    if num_retries < 0:
+        raise RuntimeError(f'Could not properly reword card {curr_card.id} after {num_retries} attempts.') 
 
     # Extract relevant properties from the card.
     curr_qtext = curr_card.note().fields[0]
@@ -204,8 +204,8 @@ def reword_card_mistral(curr_card: Card, num_tries=3) -> str: # ADD TO SETTINGS/
     # If not cloze-adjacent, skip this validation process and just return the card.
     # BUG: This ONLY goes by name. There must be a better way to validate it.
     if 'cloze' in curr_card_type.lower() and not validate_cloze_card(reworded_qtext, get_cloze_matches(curr_qtext, curr_ord)):
-        time.sleep(1) # avoid rate limit ceiling, CONSIDER ADDING TO SETTINGS/CONFIG
-        return reword_card_mistral(curr_card, num_tries - 1)
+        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        return reword_card_mistral(curr_card, num_retries - 1)
     return reworded_qtext
 
 # Based on the template used in the note, generate a rewording and rerender the front cloze.
@@ -356,6 +356,22 @@ def update_config_settings():
         config.settings.max_renders = val
     except ValueError or AssertionError:
         tooltip(f'Invalid new value \'{sdlg.form.maxRendersLineEdit.text()}\' for max renders; reverting to old value.')
+
+    # Handle num retries input
+    try:
+        val = int(sdlg.form.retryCountLineEdit.text())
+        assert val > 0
+        config.settings.num_retries = val
+    except ValueError or AssertionError:
+        tooltip(f'Invalid new value \'{sdlg.form.retryCountLineEdit.text()}\' for retry count; reverting to old value.')
+
+    # Handle retry delay input
+    try:
+        val = float(sdlg.form.retryDelayLineEdit.text())
+        assert val >= 0
+        config.settings.retry_delay_seconds = val
+    except ValueError or AssertionError:
+        tooltip(f'Invalid new value \'{sdlg.form.retryDelayLineEdit.text()}\' for retry delay; reverting to old value.')
     
     # Handle reviewer ending callback
     # As per internal gui_hooks code, no exception thrown if object to remove not found

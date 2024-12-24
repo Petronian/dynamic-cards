@@ -36,6 +36,8 @@ class SettingsDialog(QDialog):
         self.form.mistralModelLineEdit.setText(str(self.settings.model))
         self.form.maxRendersLineEdit.setText(str(self.settings.max_renders))
         self.form.textEdit.setText(str(self.settings.context))
+        self.form.retryCountLineEdit.setText(str(self.settings.num_retries))
+        self.form.retryDelayLineEdit.setText(str(self.settings.retry_delay_seconds))
         self.form.checkBox.setChecked(bool(self.settings.clear_cache_on_reviewer_end))
 
         # Set the excluded types.

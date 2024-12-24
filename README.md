@@ -90,6 +90,14 @@ settings within the Settings menu.
   available to you.
 * **Context:** Instructions fed to the LLM to generate rewordings for cards.
   If the model is misbehaving, try rewording the context to suit your needs.
+* **Retry count:** If generating a cloze-style note and the model outputs
+  an invalid result (sometimes the case), retry for this many tries. Note
+  that this will slow down the application but will reduce the number of
+  observed errors from LLM outputs.
+* **Retry delay (sec):** When redoing generations, wait this many seconds
+  before retrying. Note that this is often necessary to avoid being
+  rate-limited by LLM APIs; this has therefore been set to 1.0 seconds by
+  default.
 * **Clear cache on review end:** By default, any card rewordings that
   you create are cleared when you stop reviewing. Uncheck this option
   to allow rewordings to persist until you close Anki.

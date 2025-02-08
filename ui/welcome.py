@@ -8,16 +8,7 @@
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
 
-from aqt.qt import (QCoreApplication, QDate, QDateTime, QLocale,
-    QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt)
-from aqt.qt import (QBrush, QColor, QConicalGradient, QCursor,
-    QFont, QFontDatabase, QGradient, QIcon,
-    QImage, QKeySequence, QLinearGradient, QPainter,
-    QPalette, QPixmap, QRadialGradient, QTransform)
-from aqt.qt import (QAbstractButton, QApplication, QCheckBox, QDialog,
-    QDialogButtonBox, QHBoxLayout, QLabel, QSizePolicy,
-    QSpacerItem, QVBoxLayout, QWidget)
+from aqt.qt import *
 
 class Ui_Dialog(object):
     def setupUi(self, Dialog: QDialog):
@@ -51,8 +42,8 @@ class Ui_Dialog(object):
 
         self.buttonBox = QDialogButtonBox(self.verticalLayoutWidget)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setOrientation(Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Close)
+        self.buttonBox.setOrientation(Qt.Orientation.Horizontal)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.StandardButton.Close)
         self.buttonBox.setCenterButtons(False)
 
         self.verticalLayout.addWidget(self.buttonBox)

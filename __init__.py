@@ -27,9 +27,13 @@ config_dict = mw.addonManager.getConfig(__name__)
 config = Config(mw.addonManager, __name__, debug = False)
 
 # Debug function declarations
-def tooltip(*args, **kwargs):
+
+def _tooltip(*args, **kwargs):
     if config.debug: print(*args, **kwargs)
     tooltip_aqt(*args, **kwargs)
+
+def tooltip(*args, **kwargs):
+    mw.taskman.run_on_main(lambda: _tooltip(*args, **kwargs))
 
 # Manage a queue for tasks.
 class RewordingWorkerQueue:

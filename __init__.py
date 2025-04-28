@@ -241,7 +241,7 @@ def validate_cloze_card(curr_qtext: str, cloze_deletions: list[Optional[str]]) -
 def reword_card_mistral(curr_card: Card, num_retries: int = config.settings.num_retries) -> str: 
     # If we've run out of tries, then give up.
     if num_retries < 0:
-        raise RuntimeError(f'Could not properly reword card {curr_card.id} after {num_retries} attempts.') 
+        raise RuntimeError(f'Could not properly reword card {curr_card.id}. Please try again.') 
 
     # Extract relevant properties from the card.
     curr_qtext = curr_card.note().fields[0]

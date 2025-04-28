@@ -14,6 +14,10 @@ import json
 import re
 import time
 
+# Multitasking
+import queue
+import threading
+
 # Local imports
 from .dialog import WelcomeDialog, SettingsDialog
 from .config import Config
@@ -26,6 +30,67 @@ config = Config(mw.addonManager, __name__, debug = False)
 def tooltip(*args, **kwargs):
     if config.debug: print(*args, **kwargs)
     tooltip_aqt(*args, **kwargs)
+
+# Manage a queue for tasks.
+class RewordingWorkerQueue:
+
+    # This object must be started and should start when reviewer inits (see hook)
+    def __init__(self):
+        self.queue = None
+        self.worker_thread = None
+        self.running = False
+        if config.debug: tooltip('Queue initialized.')
+
+    # Start the worker queue if not already started.
+    def start(self):
+        if not self.running:
+            self.queue = queue.Queue()
+            self.running = True
+            self.worker_thread = threading.Thread(target=self.worker, daemon=True)
+            self.worker_thread.start()
+            if config.debug: tooltip('Queue started.')
+
+    # Continuously pop tasks off the queue
+    # Do so one-by-one to avoid throttling!
+    def worker(self):
+        while self.running:
+            if self.queue.empty():
+                time.sleep(0.5)
+            else:
+                func, args = self.queue.get()
+                func(args)
+                self.queue.task_done()
+
+    # Task helper method
+    def _task_helper(self, card: Card):
+        try:
+            new_render = create_new_cached_render(card=card)
+            update_cached_card(card=card, new_render=new_render)
+            if config.debug: tooltip(f'Completed new render for card {card.id}.')
+        except Exception as e:
+            tooltip(str(e))
+
+    # Add new tasks to the queue
+    def add_render_task(self, card: Card):
+        self.queue.put((self._task_helper, card))
+        if config.debug: tooltip(f'Queued card {card.id} for new render.')
+
+    # Stop the queue.
+    def stop(self):
+        self.running = False
+        self.worker_thread.join()
+        del self.queue
+        del self.worker_thread
+        self.queue = None
+        self.worker_thread = None
+        if config.debug: tooltip(f'Queue stopped.')
+        # Need to unblock?
+
+    # Reset the queue and have it start running again.
+    def reset(self, immediate=False):
+        self.stop(immediate=immediate)
+        self.start()
+        if config.debug: tooltip(f'Queue reset.')
 
 # Card entry format for use in the cache.
 class CachedCardEntry:
@@ -233,11 +298,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
                 card.note().note_type()['name'] not in config.settings.exclude_note_types):
 
                 if config.debug: print(f'Creating new render for card {card.id}, current cache: ', str(cce))
-                op = QueryOp(parent=mw,
-                             op=lambda col: create_new_cached_render(card=card),
-                             success=lambda render_output: update_cached_card(card, new_render=render_output))
-                op = op.failure(failure=lambda e: tooltip(str(e)))
-                op.run_in_background()
+                q.add_render_task(card=card)
             randint_fn = randint_try_norepeat if config.settings.max_renders > 1 else lambda a, b, c: 0
             cce.last_used_render = randint_fn(0, len(cce.renders) - 1, cce.last_used_render)
 
@@ -310,6 +371,12 @@ def inject_pause_generation_option(r: Reviewer, m: QMenu) -> None:
 
 def insert_separator(r: Reviewer, m: QMenu) -> None:
     m.addSeparator()
+
+# Start the asynchronous queue and have it start/stop appropriately.
+# Using the card showing as a proxy for the start of a review session.
+q = RewordingWorkerQueue()
+gui_hooks.card_will_show.append(lambda *args: q.start())
+gui_hooks.reviewer_will_end.append(lambda *args: q.stop())
 
 # Add hook using the new method
 # Also clear the reviewer once the review session is over

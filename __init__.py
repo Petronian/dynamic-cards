@@ -189,7 +189,7 @@ def create_new_cached_render(card: Card):
     note = card.note()
     note = Note(col=note.col, id=note.id)
     if config.debug: print(f'Creating new render for card {card.id} using model \'{config.settings.model}\'')
-    note.fields[0] = reword_card_mistral(card)
+    note.fields[0] = reword_card(card)
     if config.debug: print(f'Successfully created new render for card {card.id} using model \'{config.settings.model}\'')
     return note.ephemeral_card(ord=ord, custom_note_type=note.note_type(), custom_template=card.template()).render_output()
 
@@ -238,16 +238,39 @@ def validate_cloze_card(curr_qtext: str, cloze_deletions: list[Optional[str]]) -
             return False
     return True
 
-def reword_card_mistral(curr_card: Card, num_retries: int = config.settings.num_retries) -> str: 
-    # If we've run out of tries, then give up.
-    if num_retries < 0:
-        raise RuntimeError(f'Could not properly reword card {curr_card.id}. Please try again.') 
+def reword_card(curr_card: Card, num_retries: int = config.settings.num_retries, reason: Optional[str] = None) -> str:
 
     # Extract relevant properties from the card.
-    curr_qtext = curr_card.note().fields[0]
+    curr_qtext = reworded_qtext = curr_card.note().fields[0]
     curr_ord = curr_card.ord
     curr_card_type = curr_card.note().note_type()['name']
     
+    # If we've run out of tries, then give up.
+    if num_retries < 0:
+        tooltip(f'Could not properly reword card {curr_card.id} (reason: {reason}). Please try again.') 
+        return curr_qtext
+
+    try:
+        if sdlg.form.platformSelect.currentIndex() == 0:
+            reworded_qtext = reword_text_mistral(curr_qtext)
+        elif sdlg.form.platformSelect.currentIndex() == 1:
+            reworded_qtext = reword_text_gemini(curr_qtext)
+        else:
+            raise RuntimeError(f'Unknown platform index {sdlg.form.platformSelect.currentIndex()} for rewording card {curr_card.id}.')
+    except RuntimeError as e:
+        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        reword_card(curr_card, num_retries - 1, reason=str(e))
+    
+    # If the card is cloze-adjacent, then validate it. If valid, return the card.
+    # If not cloze-adjacent, skip this validation process and just return the card.
+    # BUG: This ONLY goes by name. There must be a better way to validate it.
+    if 'cloze' in curr_card_type.lower() and not validate_cloze_card(reworded_qtext, get_cloze_matches(curr_qtext, curr_ord)):
+        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        return reword_card(curr_card, num_retries - 1, reason='Cloze validation failed')
+    return reworded_qtext
+        
+def reword_text_mistral(curr_qtext: str) -> str: 
+       
     # Try to reword the card using Mistral.
     try:
         chat_response = requests.post(url="https://api.mistral.ai/v1/chat/completions",
@@ -260,22 +283,47 @@ def reword_card_mistral(curr_card: Card, num_retries: int = config.settings.num_
                                                            {'role': 'user', 'content': curr_qtext}
                                                        ]}))
         if not (chat_response.status_code >= 200 and chat_response.status_code < 300):
-            raise requests.exceptions.RequestException(chat_response.json().get('message', 'Unspecified error'))
-        reworded_qtext = chat_response.json()['choices'][0]['message']['content']
+            raise requests.exceptions.RequestException(chat_response.json().get('message', f'Unspecified error ({chat_response.status_code})'))
+        return chat_response.json()['choices'][0]['message']['content']
     except Exception as e:
         # Throw an error.
         # # print('Error with Mistral. Is your API key working?')
         raise RuntimeError(f'Error loading \'{config.settings.model}\' for dynamic Anki cards: ' + str(e))
                           # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
                           # 'If this continues, disable this add-on to stop these messages.')
-    
-    # If the card is cloze-adjacent, then validate it. If valid, return the card.
-    # If not cloze-adjacent, skip this validation process and just return the card.
-    # BUG: This ONLY goes by name. There must be a better way to validate it.
-    if 'cloze' in curr_card_type.lower() and not validate_cloze_card(reworded_qtext, get_cloze_matches(curr_qtext, curr_ord)):
-        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
-        return reword_card_mistral(curr_card, num_retries - 1)
-    return reworded_qtext
+
+def reword_text_gemini(curr_qtext: str) -> str: 
+       
+    # Try to reword the card using Gemini.
+    try:
+        chat_response = requests.post(
+            url=f"https://generativelanguage.googleapis.com/v1beta/models/{config.settings.model}:generateContent",
+            headers={
+                'Content-Type': 'application/json',
+                'X-goog-api-key': config.settings.api_key
+            },
+            data=json.dumps({
+                'contents': [{
+                    'parts': [{'text': curr_qtext}]
+                }],
+                'system_instruction': {
+                    'parts': [{'text': config.settings.context}]
+                },
+                'generationConfig': {
+                    'thinkingConfig': {
+                        'thinkingBudget': 0 # prefer fast models, this will error with CoT/reasoning models
+                    }
+                }})
+        )
+        if not (chat_response.status_code >= 200 and chat_response.status_code < 300):
+            raise requests.exceptions.RequestException(chat_response.json().get('message', f'Unspecified error ({chat_response.status_code})'))
+        return chat_response.json()['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        # Throw an error.
+        # # print('Error with Gemini. Is your API key working?')
+        raise RuntimeError(f'Error loading \'{config.settings.model}\' for dynamic Anki cards: ' + str(e))
+                          # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
+                          # 'If this continues, disable this add-on to stop these messages.')
 
 # Based on the template used in the note, generate a rewording and rerender the front cloze.
 def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
@@ -414,11 +462,12 @@ def update_config_settings():
     config.settings.shortcut_clear_all_cards = sdlg.form.keySequenceEdit_2.keySequence().toString()
     config.settings.shortcut_include_exclude = sdlg.form.keySequenceEdit_3.keySequence().toString()
     config.settings.shortcut_pause = sdlg.form.keySequenceEdit_4.keySequence().toString()
-    config.settings.api_key = sdlg.form.mistralAPIKeyLineEdit.text()
-    config.settings.model = sdlg.form.mistralModelLineEdit.text()
+    config.settings.api_key = sdlg.form.APIKeyLineEdit.text()
+    config.settings.model = sdlg.form.modelLineEdit.text()
     config.settings.context = sdlg.form.textEdit.toPlainText()
     config.settings.clear_cache_on_reviewer_end = sdlg.form.checkBox.isChecked()
     config.settings.exclude_note_types = [sdlg.form.listWidget.item(i).text() for i in range(sdlg.form.listWidget.count())]
+    config.settings.platform_index = sdlg.form.platformSelect.currentIndex()
 
     # Handle max render input
     try:

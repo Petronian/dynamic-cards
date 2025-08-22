@@ -5,9 +5,8 @@ content? Introducing the **Dynamic Cards** plugin, a small plugin
 that allows Anki to ping LLMs to slightly change the content of your cards
 each time you review them.
 
-This extension currently relies solely upon **Mistral AI** for generating and
-serving new content; please note that your cards will be used as training
-data if you use Mistral's free tier for your API key.
+This extension currently relies upon either **Mistral AI** or **Google Gemini** for generating and
+serving new content. Please keep usage agreements and rate limits in mind.
 
 > [!WARNING]
 > This has only been tested on a Windows 11 machine with PyQt6. It is possible
@@ -28,20 +27,21 @@ through the *Add-ons > Get Add-ons* menu in Anki itself.
 There are some critical steps that need to be done before this extension may
 be used.
 
-1. **Create a Mistral API key:** Create a free account at
-   [Mistral AI](https://console.mistral.ai/) to get started. Once created,
-   navigate to the [API Keys](https://console.mistral.ai/api-keys/) page
-   and follow instructions to create a **free** API key.
+1. **Create an API key:** Create a free account at
+   [Mistral AI](https://console.mistral.ai/) or [Google Gemini](https://gemini.google.com)
+   to get started. Follow the appropriate instructions to create a **free** API key.
+   (This also works with paid keys if you've got the funds!)
 2. **Paste the API key into the extension.** Navigate to the *Tools > Dynamic
-   Cards* window in Anki. Then, paste your API key into the *Mistral API key*
-   field.
+   Cards* window in Anki. Then, paste your API key into the *API key*
+   field. Make sure the *Platform* dropdown is set to the appropriate service
+   (Mistral or Google for now).
 3. That's it! **The plugin should begin working immediately without further
    action; changes will initially be subtle. Enjoy your dynamic cards!**
 
 > [!IMPORTANT]
 > If you see a tooltip (pop-up) saying 'Unauthorized', there is a problem with
 > your API key. Please try again or raise an issue on GitHub (see **Bugs and
-  other issues**) if that doesn't work.
+> other issues**) if that doesn't work.
 
 > [!WARNING]
 > This extension might not work with certain types of cards, but should work
@@ -82,8 +82,9 @@ settings within the Settings menu.
 * **Pause dynamic card generation:** Temporaeily stop the generation of
   dynamic cards by pressing this hotkey during review. Press the hotkey
   again to resume dynamic card generation.
-* **Mistral API key:** The API key to allow access to Mistral's API.
-* **Mistral model:** The Mistral model to use to generate card rewordings.
+* **Platform:** The platform hosting the model you're using.
+* **API key:** The API key to allow access to your platform's API.
+* **Model:** The model to use to generate card rewordings.
 * **Max renders:** The maximum number of alternative "versions" of a card to
   hold. The default is `3` to balance storage use with a healthy variety of
   cards. Increasing this will increase the number of rewordings of cards

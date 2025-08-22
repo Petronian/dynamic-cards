@@ -10,6 +10,8 @@
 
 from aqt.qt import *
 
+PLATFORMS = ["Mistral AI (Mistral)", "Gemini (Google)"]
+
 class Ui_Dialog(object):
     def setupUi(self, Dialog: QDialog):
         if not Dialog.objectName():
@@ -106,72 +108,79 @@ class Ui_Dialog(object):
         self.maxRendersLabel = QLabel(self.verticalLayoutWidget)
         self.maxRendersLabel.setObjectName(u"maxRendersLabel")
 
-        self.formLayout.setWidget(2, QFormLayout.ItemRole.LabelRole, self.maxRendersLabel)
+        self.platformSelectLabel = QLabel(self.verticalLayoutWidget)
+        self.platformSelect = QComboBox(self.verticalLayoutWidget)
+        self.platformSelect.setObjectName(u"platformSelect")
+        self.platformSelect.addItems(PLATFORMS)
+        self.formLayout.setWidget(0, QFormLayout.ItemRole.LabelRole, self.platformSelectLabel)
+        self.formLayout.setWidget(0, QFormLayout.ItemRole.FieldRole, self.platformSelect)
+
+        self.formLayout.setWidget(3, QFormLayout.ItemRole.LabelRole, self.maxRendersLabel)
 
         self.maxRendersLineEdit = QLineEdit(self.verticalLayoutWidget)
         self.maxRendersLineEdit.setObjectName(u"maxRendersLineEdit")
 
-        self.formLayout.setWidget(2, QFormLayout.ItemRole.FieldRole, self.maxRendersLineEdit)
+        self.formLayout.setWidget(3, QFormLayout.ItemRole.FieldRole, self.maxRendersLineEdit)
 
         self.mistralAPIKeyLabel = QLabel(self.verticalLayoutWidget)
         self.mistralAPIKeyLabel.setObjectName(u"mistralAPIKeyLabel")
 
-        self.formLayout.setWidget(0, QFormLayout.ItemRole.LabelRole, self.mistralAPIKeyLabel)
+        self.formLayout.setWidget(1, QFormLayout.ItemRole.LabelRole, self.mistralAPIKeyLabel)
 
-        self.mistralAPIKeyLineEdit = QLineEdit(self.verticalLayoutWidget)
-        self.mistralAPIKeyLineEdit.setObjectName(u"mistralAPIKeyLineEdit")
+        self.APIKeyLineEdit = QLineEdit(self.verticalLayoutWidget)
+        self.APIKeyLineEdit.setObjectName(u"mistralAPIKeyLineEdit")
 
-        self.formLayout.setWidget(0, QFormLayout.ItemRole.FieldRole, self.mistralAPIKeyLineEdit)
+        self.formLayout.setWidget(1, QFormLayout.ItemRole.FieldRole, self.APIKeyLineEdit)
 
         self.mistralModelLabel = QLabel(self.verticalLayoutWidget)
         self.mistralModelLabel.setObjectName(u"mistralModelLabel")
 
-        self.formLayout.setWidget(1, QFormLayout.ItemRole.LabelRole, self.mistralModelLabel)
+        self.formLayout.setWidget(2, QFormLayout.ItemRole.LabelRole, self.mistralModelLabel)
 
-        self.mistralModelLineEdit = QLineEdit(self.verticalLayoutWidget)
-        self.mistralModelLineEdit.setObjectName(u"mistralModelLineEdit")
+        self.modelLineEdit = QLineEdit(self.verticalLayoutWidget)
+        self.modelLineEdit.setObjectName(u"mistralModelLineEdit")
 
-        self.formLayout.setWidget(1, QFormLayout.ItemRole.FieldRole, self.mistralModelLineEdit)
+        self.formLayout.setWidget(2, QFormLayout.ItemRole.FieldRole, self.modelLineEdit)
 
         self.textEdit = QTextEdit(self.verticalLayoutWidget)
         self.textEdit.setObjectName(u"textEdit")
 
-        self.formLayout.setWidget(3, QFormLayout.ItemRole.FieldRole, self.textEdit)
+        self.formLayout.setWidget(4, QFormLayout.ItemRole.FieldRole, self.textEdit)
 
         self.contextLabel = QLabel(self.verticalLayoutWidget)
         self.contextLabel.setObjectName(u"contextLabel")
 
-        self.formLayout.setWidget(3, QFormLayout.ItemRole.LabelRole, self.contextLabel)
+        self.formLayout.setWidget(4, QFormLayout.ItemRole.LabelRole, self.contextLabel)
 
         self.retryCountLabel = QLabel(self.verticalLayoutWidget)
         self.retryCountLabel.setObjectName(u"retryCountLabel")
 
-        self.formLayout.setWidget(4, QFormLayout.ItemRole.LabelRole, self.retryCountLabel)
+        self.formLayout.setWidget(5, QFormLayout.ItemRole.LabelRole, self.retryCountLabel)
 
         self.retryCountLineEdit = QLineEdit(self.verticalLayoutWidget)
         self.retryCountLineEdit.setObjectName(u"retryCountLineEdit")
 
-        self.formLayout.setWidget(4, QFormLayout.ItemRole.FieldRole, self.retryCountLineEdit)
+        self.formLayout.setWidget(5, QFormLayout.ItemRole.FieldRole, self.retryCountLineEdit)
 
         self.retryDelayLabel = QLabel(self.verticalLayoutWidget)
         self.retryDelayLabel.setObjectName(u"retryDelayLabel")
 
-        self.formLayout.setWidget(5, QFormLayout.ItemRole.LabelRole, self.retryDelayLabel)
+        self.formLayout.setWidget(6, QFormLayout.ItemRole.LabelRole, self.retryDelayLabel)
 
         self.retryDelayLineEdit = QLineEdit(self.verticalLayoutWidget)
         self.retryDelayLineEdit.setObjectName(u"retryDelayLineEdit")
 
-        self.formLayout.setWidget(5, QFormLayout.ItemRole.FieldRole, self.retryDelayLineEdit)
+        self.formLayout.setWidget(6, QFormLayout.ItemRole.FieldRole, self.retryDelayLineEdit)
 
         self.pauseDynamicCardGeneration = QLabel(self.verticalLayoutWidget)
         self.pauseDynamicCardGeneration.setObjectName(u"excludeUnexcludeCurrentCardTypeLabel_2")
 
-        self.formLayout_3.setWidget(3, QFormLayout.ItemRole.LabelRole, self.pauseDynamicCardGeneration)
+        self.formLayout_3.setWidget(4, QFormLayout.ItemRole.LabelRole, self.pauseDynamicCardGeneration)
 
         self.keySequenceEdit_4 = QKeySequenceEdit(self.verticalLayoutWidget)
         self.keySequenceEdit_4.setObjectName(u"keySequenceEdit_4")
 
-        self.formLayout_3.setWidget(3, QFormLayout.ItemRole.FieldRole, self.keySequenceEdit_4)
+        self.formLayout_3.setWidget(4, QFormLayout.ItemRole.FieldRole, self.keySequenceEdit_4)
 
 
         self.verticalLayout.addLayout(self.formLayout)
@@ -250,6 +259,7 @@ class Ui_Dialog(object):
     # setupUi
     def retranslateUi(self, Dialog: QDialog):
         Dialog.setWindowTitle(QCoreApplication.translate("Dialog", u"Dynamic Cards Settings", None))
+        self.platformSelectLabel.setText(QCoreApplication.translate("Dialog", u"Platform", None))
         self.label.setText(QCoreApplication.translate("Dialog", u"<h1>Dynamic Cards Settings</h1>", None))
         self.label_3.setText(QCoreApplication.translate("Dialog", u"<b>Keyboard Shortcuts</b>", None))
         self.clearCurrentCardFromCacheLabel.setText(QCoreApplication.translate("Dialog", u"Clear current card from cache", None))
@@ -258,8 +268,8 @@ class Ui_Dialog(object):
         self.pauseDynamicCardGeneration.setText(QCoreApplication.translate("Dialog", u"Pause dynamic card generation", None))
         self.label_2.setText(QCoreApplication.translate("Dialog", u"<b>LLM Functionality</b>", None))
         self.maxRendersLabel.setText(QCoreApplication.translate("Dialog", u"Max renders", None))
-        self.mistralAPIKeyLabel.setText(QCoreApplication.translate("Dialog", u"Mistral API key", None))
-        self.mistralModelLabel.setText(QCoreApplication.translate("Dialog", u"Mistral model", None))
+        self.mistralAPIKeyLabel.setText(QCoreApplication.translate("Dialog", u"API key", None))
+        self.mistralModelLabel.setText(QCoreApplication.translate("Dialog", u"Model", None))
         self.contextLabel.setText(QCoreApplication.translate("Dialog", u"Context", None))
         self.label_6.setText(QCoreApplication.translate("Dialog", u"<b>Review Behavior</b>", None))
         self.checkBox.setText(QCoreApplication.translate("Dialog", u"Clear cache on review end", None))

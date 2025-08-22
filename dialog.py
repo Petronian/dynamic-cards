@@ -32,11 +32,14 @@ class SettingsDialog(QDialog):
         self.form.keySequenceEdit_2.setKeySequence(str(self.settings.shortcut_clear_all_cards))
         self.form.keySequenceEdit_3.setKeySequence(str(self.settings.shortcut_include_exclude))
         self.form.keySequenceEdit_4.setKeySequence(str(self.settings.shortcut_pause))
-        self.form.mistralAPIKeyLineEdit.setText(str(self.settings.api_key))
-        self.form.mistralModelLineEdit.setText(str(self.settings.model))
+        self.form.APIKeyLineEdit.setText(str(self.settings.api_key))
+        self.form.modelLineEdit.setText(str(self.settings.model))
         self.form.maxRendersLineEdit.setText(str(self.settings.max_renders))
         self.form.textEdit.setText(str(self.settings.context))
+        self.form.retryCountLineEdit.setText(str(self.settings.num_retries))
+        self.form.retryDelayLineEdit.setText(str(self.settings.retry_delay_seconds))
         self.form.checkBox.setChecked(bool(self.settings.clear_cache_on_reviewer_end))
+        self.form.platformSelect.setCurrentIndex(int(self.settings.platform_index))
 
         # Set the excluded types.
         self.form.listWidget.clear()

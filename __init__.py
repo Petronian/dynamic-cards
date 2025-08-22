@@ -11,6 +11,12 @@ from anki.template import TemplateRenderOutput
 from random import randint
 import requests
 import json
+import re
+import time
+
+# Multitasking
+import queue
+import threading
 
 # Local imports
 from .dialog import WelcomeDialog, SettingsDialog
@@ -21,9 +27,74 @@ config_dict = mw.addonManager.getConfig(__name__)
 config = Config(mw.addonManager, __name__, debug = False)
 
 # Debug function declarations
-def tooltip(*args, **kwargs):
+
+def _tooltip(*args, **kwargs):
     if config.debug: print(*args, **kwargs)
     tooltip_aqt(*args, **kwargs)
+
+def tooltip(*args, **kwargs):
+    mw.taskman.run_on_main(lambda: _tooltip(*args, **kwargs))
+
+# Manage a queue for tasks.
+class RewordingWorkerQueue:
+
+    # This object must be started and should start when reviewer inits (see hook)
+    def __init__(self):
+        self.queue = None
+        self.worker_thread = None
+        self.running = False
+        if config.debug: tooltip('Queue initialized.')
+
+    # Start the worker queue if not already started.
+    def start(self):
+        if not self.running:
+            self.queue = queue.Queue()
+            self.running = True
+            self.worker_thread = threading.Thread(target=self.worker, daemon=True)
+            self.worker_thread.start()
+            if config.debug: tooltip('Queue started.')
+
+    # Continuously pop tasks off the queue
+    # Do so one-by-one to avoid throttling!
+    def worker(self):
+        while self.running:
+            if self.queue.empty():
+                time.sleep(0.5)
+            else:
+                func, args = self.queue.get()
+                func(args)
+                self.queue.task_done()
+
+    # Task helper method
+    def _task_helper(self, card: Card):
+        try:
+            new_render = create_new_cached_render(card=card)
+            update_cached_card(card=card, new_render=new_render)
+            if config.debug: tooltip(f'Completed new render for card {card.id}.')
+        except Exception as e:
+            tooltip(str(e))
+
+    # Add new tasks to the queue
+    def add_render_task(self, card: Card):
+        self.queue.put((self._task_helper, card))
+        if config.debug: tooltip(f'Queued card {card.id} for new render.')
+
+    # Stop the queue.
+    def stop(self):
+        self.running = False
+        self.worker_thread.join()
+        del self.queue
+        del self.worker_thread
+        self.queue = None
+        self.worker_thread = None
+        if config.debug: tooltip(f'Queue stopped.')
+        # Need to unblock?
+
+    # Reset the queue and have it start running again.
+    def reset(self, immediate=False):
+        self.stop(immediate=immediate)
+        self.start()
+        if config.debug: tooltip(f'Queue reset.')
 
 # Card entry format for use in the cache.
 class CachedCardEntry:
@@ -118,7 +189,7 @@ def create_new_cached_render(card: Card):
     note = card.note()
     note = Note(col=note.col, id=note.id)
     if config.debug: print(f'Creating new render for card {card.id} using model \'{config.settings.model}\'')
-    note.fields[0] = reword_card_mistral(note.fields[0])
+    note.fields[0] = reword_card(card)
     if config.debug: print(f'Successfully created new render for card {card.id} using model \'{config.settings.model}\'')
     return note.ephemeral_card(ord=ord, custom_note_type=note.note_type(), custom_template=card.template()).render_output()
 
@@ -153,7 +224,54 @@ def clear_cache_on_editor_load_note(e: Editor):
     # if mw.reviewer.card is not None:
     #     mw.reviewer._redraw_current_card()
 
-def reword_card_mistral(curr_qtext):
+# Find all cloze matches of a given ord in a cloze card.
+# Case insensitive.
+def get_cloze_matches(curr_qtext, ord) -> list[str]:
+    pattern = r'{{c' + str(ord + 1) + r'.+?}}'
+    return re.findall(pattern, curr_qtext, flags=re.RegexFlag.IGNORECASE)
+
+# Ensure all cloze deletions are in curr_qtext.
+# Case insensitive.
+def validate_cloze_card(curr_qtext: str, cloze_deletions: list[Optional[str]]) -> bool:
+    for cloze_deletion in cloze_deletions:
+        if cloze_deletion.lower() not in curr_qtext.lower():
+            return False
+    return True
+
+def reword_card(curr_card: Card, num_retries: int = config.settings.num_retries, reason: Optional[str] = None) -> str:
+
+    # Extract relevant properties from the card.
+    curr_qtext = reworded_qtext = curr_card.note().fields[0]
+    curr_ord = curr_card.ord
+    curr_card_type = curr_card.note().note_type()['name']
+    
+    # If we've run out of tries, then give up.
+    if num_retries < 0:
+        tooltip(f'Could not properly reword card {curr_card.id} (reason: {reason}). Please try again.') 
+        return curr_qtext
+
+    try:
+        if sdlg.form.platformSelect.currentIndex() == 0:
+            reworded_qtext = reword_text_mistral(curr_qtext)
+        elif sdlg.form.platformSelect.currentIndex() == 1:
+            reworded_qtext = reword_text_gemini(curr_qtext)
+        else:
+            raise RuntimeError(f'Unknown platform index {sdlg.form.platformSelect.currentIndex()} for rewording card {curr_card.id}.')
+    except RuntimeError as e:
+        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        reword_card(curr_card, num_retries - 1, reason=str(e))
+    
+    # If the card is cloze-adjacent, then validate it. If valid, return the card.
+    # If not cloze-adjacent, skip this validation process and just return the card.
+    # BUG: This ONLY goes by name. There must be a better way to validate it.
+    if 'cloze' in curr_card_type.lower() and not validate_cloze_card(reworded_qtext, get_cloze_matches(curr_qtext, curr_ord)):
+        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        return reword_card(curr_card, num_retries - 1, reason='Cloze validation failed')
+    return reworded_qtext
+        
+def reword_text_mistral(curr_qtext: str) -> str: 
+       
+    # Try to reword the card using Mistral.
     try:
         chat_response = requests.post(url="https://api.mistral.ai/v1/chat/completions",
                                       headers={'Content-Type': 'application/json',
@@ -164,13 +282,45 @@ def reword_card_mistral(curr_qtext):
                                                            {'role': 'system', 'content': config.settings.context},
                                                            {'role': 'user', 'content': curr_qtext}
                                                        ]}))
-        
         if not (chat_response.status_code >= 200 and chat_response.status_code < 300):
-            raise requests.exceptions.RequestException(chat_response.json().get('message', 'Unspecified error'))
+            raise requests.exceptions.RequestException(chat_response.json().get('message', f'Unspecified error ({chat_response.status_code})'))
         return chat_response.json()['choices'][0]['message']['content']
     except Exception as e:
         # Throw an error.
         # # print('Error with Mistral. Is your API key working?')
+        raise RuntimeError(f'Error loading \'{config.settings.model}\' for dynamic Anki cards: ' + str(e))
+                          # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
+                          # 'If this continues, disable this add-on to stop these messages.')
+
+def reword_text_gemini(curr_qtext: str) -> str: 
+       
+    # Try to reword the card using Gemini.
+    try:
+        chat_response = requests.post(
+            url=f"https://generativelanguage.googleapis.com/v1beta/models/{config.settings.model}:generateContent",
+            headers={
+                'Content-Type': 'application/json',
+                'X-goog-api-key': config.settings.api_key
+            },
+            data=json.dumps({
+                'contents': [{
+                    'parts': [{'text': curr_qtext}]
+                }],
+                'system_instruction': {
+                    'parts': [{'text': config.settings.context}]
+                },
+                'generationConfig': {
+                    'thinkingConfig': {
+                        'thinkingBudget': 0 # prefer fast models, this will error with CoT/reasoning models
+                    }
+                }})
+        )
+        if not (chat_response.status_code >= 200 and chat_response.status_code < 300):
+            raise requests.exceptions.RequestException(chat_response.json().get('message', f'Unspecified error ({chat_response.status_code})'))
+        return chat_response.json()['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        # Throw an error.
+        # # print('Error with Gemini. Is your API key working?')
         raise RuntimeError(f'Error loading \'{config.settings.model}\' for dynamic Anki cards: ' + str(e))
                           # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
                           # 'If this continues, disable this add-on to stop these messages.')
@@ -200,11 +350,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
                 card.note().note_type()['name'] not in config.settings.exclude_note_types):
 
                 if config.debug: print(f'Creating new render for card {card.id}, current cache: ', str(cce))
-                op = QueryOp(parent=mw,
-                             op=lambda col: create_new_cached_render(card=card),
-                             success=lambda render_output: update_cached_card(card, new_render=render_output))
-                op = op.failure(failure=lambda e: tooltip(str(e)))
-                op.run_in_background()
+                q.add_render_task(card=card)
             randint_fn = randint_try_norepeat if config.settings.max_renders > 1 else lambda a, b, c: 0
             cce.last_used_render = randint_fn(0, len(cce.renders) - 1, cce.last_used_render)
 
@@ -278,6 +424,12 @@ def inject_pause_generation_option(r: Reviewer, m: QMenu) -> None:
 def insert_separator(r: Reviewer, m: QMenu) -> None:
     m.addSeparator()
 
+# Start the asynchronous queue and have it start/stop appropriately.
+# Using the card showing as a proxy for the start of a review session.
+q = RewordingWorkerQueue()
+gui_hooks.card_will_show.append(lambda *args: q.start())
+gui_hooks.reviewer_will_end.append(lambda *args: q.stop())
+
 # Add hook using the new method
 # Also clear the reviewer once the review session is over
 # Also clear cards from the cache when they are to be edited
@@ -310,11 +462,12 @@ def update_config_settings():
     config.settings.shortcut_clear_all_cards = sdlg.form.keySequenceEdit_2.keySequence().toString()
     config.settings.shortcut_include_exclude = sdlg.form.keySequenceEdit_3.keySequence().toString()
     config.settings.shortcut_pause = sdlg.form.keySequenceEdit_4.keySequence().toString()
-    config.settings.api_key = sdlg.form.mistralAPIKeyLineEdit.text()
-    config.settings.model = sdlg.form.mistralModelLineEdit.text()
+    config.settings.api_key = sdlg.form.APIKeyLineEdit.text()
+    config.settings.model = sdlg.form.modelLineEdit.text()
     config.settings.context = sdlg.form.textEdit.toPlainText()
     config.settings.clear_cache_on_reviewer_end = sdlg.form.checkBox.isChecked()
     config.settings.exclude_note_types = [sdlg.form.listWidget.item(i).text() for i in range(sdlg.form.listWidget.count())]
+    config.settings.platform_index = sdlg.form.platformSelect.currentIndex()
 
     # Handle max render input
     try:
@@ -323,6 +476,22 @@ def update_config_settings():
         config.settings.max_renders = val
     except ValueError or AssertionError:
         tooltip(f'Invalid new value \'{sdlg.form.maxRendersLineEdit.text()}\' for max renders; reverting to old value.')
+
+    # Handle num retries input
+    try:
+        val = int(sdlg.form.retryCountLineEdit.text())
+        assert val > 0
+        config.settings.num_retries = val
+    except ValueError or AssertionError:
+        tooltip(f'Invalid new value \'{sdlg.form.retryCountLineEdit.text()}\' for retry count; reverting to old value.')
+
+    # Handle retry delay input
+    try:
+        val = float(sdlg.form.retryDelayLineEdit.text())
+        assert val >= 0
+        config.settings.retry_delay_seconds = val
+    except ValueError or AssertionError:
+        tooltip(f'Invalid new value \'{sdlg.form.retryDelayLineEdit.text()}\' for retry delay; reverting to old value.')
     
     # Handle reviewer ending callback
     # As per internal gui_hooks code, no exception thrown if object to remove not found

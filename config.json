@@ -1,4 +1,5 @@
 {
+    "platform_index": 0,
     "model": "mistral-large-latest",
     "api_key": "",
     "context": "You are a program intended to rewrite Anki cards. Rewrite the following Anki card while not changing any of the cloze-deleted text, and do not say anything else besides the reworded card. Try and vary the sentence structure appreciably. Preserve HTML formatting; don't use Markdown.",

@@ -247,16 +247,16 @@ def reword_card(curr_card: Card, num_retries: int = config.settings.num_retries,
     
     # If we've run out of tries, then give up.
     if num_retries < 0:
-        tooltip(f'Could not properly reword card {curr_card.id} (reason: {reason}). Please try again.') 
+        tooltip(f'Could not properly reword card {curr_card.id} using platform {config.settings.platform_index} (reason: {reason}). Please try again.') 
         return curr_qtext
 
     try:
-        if sdlg.form.platformSelect.currentIndex() == 0:
+        if config.settings.platform_index == 0:
             reworded_qtext = reword_text_mistral(curr_qtext)
-        elif sdlg.form.platformSelect.currentIndex() == 1:
+        elif config.settings.platform_index == 1:
             reworded_qtext = reword_text_gemini(curr_qtext)
         else:
-            raise RuntimeError(f'Unknown platform index {sdlg.form.platformSelect.currentIndex()} for rewording card {curr_card.id}.')
+            raise RuntimeError(f'Unknown platform index {config.settings.platform_index} for rewording card {curr_card.id}.')
     except RuntimeError as e:
         time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
         reword_card(curr_card, num_retries - 1, reason=str(e))

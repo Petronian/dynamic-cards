@@ -1,5 +1,9 @@
 # Dynamic Cards
 
+> [!CAUTION]
+> For some reason, I have been locked out of updating the Anki Addons page.
+> I will update the extension as soon as possible with the most recent fix.
+
 Hate when you memorize the wording of an Anki card rather than the card's
 content? Introducing the **Dynamic Cards** plugin, a small plugin
 that allows Anki to ping LLMs to slightly change the content of your cards

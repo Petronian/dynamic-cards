@@ -1,6 +1,7 @@
 # This might be a bit shaky.
 from typing import Any, Optional
 from aqt.addons import AddonManager
+from os.path import abspath, dirname, join
 
 class Config:
 
@@ -15,13 +16,18 @@ class Config:
         self.debug = debug
 
         # Settings variables
-        self.settings = Settings(addon_manager=addon_manager, module_name=module_name)
+        self.settings = Settings(addon_manager=addon_manager, module_name=module_name, debug=debug)
 
 class Settings:
-    def __init__(self, addon_manager: AddonManager, module_name: str):
+
+    CACHE = join(dirname(abspath(__file__)), 'dynamic.db')
+    
+    def __init__(self, addon_manager: AddonManager, module_name: str, debug: bool = False):
         self.setattr_nowrite('_addon_manager', addon_manager)
         self.setattr_nowrite('_module_name', module_name)
         self._read_settings()
+        if debug:
+            print(f'Settings: Establishing CACHE at {self.CACHE}')
 
     # Any time a setting is changed, write it to the configuration file.
     def __setattr__(self, name: str, value: Any) -> None:

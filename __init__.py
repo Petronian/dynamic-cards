@@ -46,7 +46,7 @@ def setup_dynamic_db():
     CREATE TABLE IF NOT EXISTS id_to_strings (
         id INTEGER PRIMARY KEY,
         items TEXT,
-        last_render INTEGER
+        last_renders TEXT
     )
     """)
     conn.close()
@@ -72,66 +72,51 @@ def get_strings_by_id(id_val: int) -> List[str]:
         return None
 
 # Function to look up cached strings by ID
-def get_last_render_by_id(id_val: int) -> List[str]:
+def get_last_renders_by_id(id_val: int) -> Optional[dict[int, int]]:
     conn, cursor = connect_dynamic_db()
-    cursor.execute("SELECT last_render FROM id_to_strings WHERE id = ?", (id_val,))
+    cursor.execute("SELECT last_renders FROM id_to_strings WHERE id = ?", (id_val,))
     result = cursor.fetchone()
     if config.debug: print(f'SQL last render for {id_val}:', result)
     conn.commit()
     conn.close()
-    return result[0] if result else None
+    return {int(x): int(y) for x, y in json.loads(result[0]).items()} if result else None
 
 # Function to look up all cached info by ID
 def get_all_by_id(id_val: int) -> List[str]:
     conn, cursor = connect_dynamic_db()
-    cursor.execute("SELECT items, last_render FROM id_to_strings WHERE id = ?", (id_val,))
+    cursor.execute("SELECT items, last_renders FROM id_to_strings WHERE id = ?", (id_val,))
     result = cursor.fetchone()
     if config.debug: print(f'SQL all for {id_val}:', result)
     conn.commit()
     conn.close()
 
     if result and result[0]:
-        texts, last_render = result
-        return json.loads(texts), last_render  # Deserialize JSON string to list
+        texts, last_renders = result
+        return json.loads(texts), {int(x): int(y) for x, y in json.loads(last_renders).items()}  # Deserialize JSON string to list
     else:
         return None
 
 # Function to set cached strings by ID
-def set_all_by_id(id_val: int, strings: List[str], last_render: int):
+def set_all_by_id(id_val: int, strings: List[str], last_renders: Optional[dict[int, int]]):
     conn, cursor = connect_dynamic_db()
-    cursor.execute(f"INSERT OR REPLACE INTO id_to_strings (id, items, last_render) VALUES (?, ?, ?)", (id_val, json.dumps(strings), last_render))
+    cursor.execute(f"INSERT OR REPLACE INTO id_to_strings (id, items, last_renders) VALUES (?, ?, ?)", (id_val, json.dumps(strings), json.dumps(last_renders)))
     conn.commit()
     conn.close()
 
 # Function to set cached strings by ID
 def set_strings_by_id(id_val: int, strings: List[str]):
     # See if id exists
-    last_render = get_last_render_by_id(id_val)
-    set_all_by_id(id_val, strings, last_render if last_render is not None else 0)
+    last_render = get_last_renders_by_id(id_val)
+    set_all_by_id(id_val, strings, last_render if last_render is not None else {i: 0 for i, _ in enumerate(strings)})
 
 # Function to set last render by ID
-def set_last_render_by_id(id_val: int, last_render: int):
+def set_last_renders_by_id(id_val: int, last_renders: dict[int, int]):
     # See if id exists
     strings = get_strings_by_id(id_val)
-    set_all_by_id(id_val, strings if strings is not None else [], last_render)
+    set_all_by_id(id_val, strings if strings is not None else [""] * len(last_renders), last_renders)
 
-# Additional helper function for appending strings
-def append_string_by_id(id_val: int, string: str):
-    old = get_strings_by_id(id_val)
-    new = old + [string] if old is not None else [string] # Also handles []
-    set_strings_by_id(id_val, new)
-
-# Additional helper function for popping strings from cache
-# Sets blank lists to be deleted
-def pop_string_by_id(id_val: int):
-    curr = get_strings_by_id(id_val)
-    out = curr.pop() # Will error if curr is None or [] as intended
-    if len(curr): set_strings_by_id(id_val, curr)
-    else: clear_strings_by_id(id_val)
-    return out
-    
 # Additional helper function for clearing an entry
-def clear_strings_by_id(id_val: int):
+def clear_all_by_id(id_val: int):
     conn, cursor = connect_dynamic_db()
     cursor.execute("DELETE FROM id_to_strings WHERE id = ?", (id_val,))
     conn.commit()
@@ -177,19 +162,19 @@ class RewordingWorkerQueue:
     # Task helper method
     def _task_helper(self, card: Card):
         try:
-            new_render, new_text = create_new_dynamic_cached_render(card=card, return_text=True)
-            if new_render is not None:
-                update_cached_card(card=card, new_render=new_render, new_text=new_text)
-                if config.debug: tooltip(f'Completed new render for card {card.id}.')
+            new_text = create_new_dynamic_wording(note=card.note())
+            if new_text is not None:
+                update_cached_note_for_card(card=card, new_text=new_text)
+                if config.debug: tooltip(f'Completed new wording task for card {card.id}.')
             elif config.debug:
-                print(f'Could not complete new render for card {card.id}.')
+                print(f'Could not complete new wording task for card {card.id}.')
         except Exception as e:
             tooltip(str(e))
 
     # Add new tasks to the queue
     def add_render_task(self, card: Card):
         self.queue.put((self._task_helper, card))
-        if config.debug: tooltip(f'Queued card {card.id} for new render.')
+        if config.debug: tooltip(f'Queued card {card.id} for new wording task.')
 
     # Stop the queue.
     def stop(self):
@@ -208,22 +193,33 @@ class RewordingWorkerQueue:
         self.start()
         if config.debug: tooltip(f'Queue reset.')
 
-# Card entry format for use in the cache.
-class CachedCardEntry:
-    id: int
-    renders: Collection[TemplateRenderOutput]
-    last_used_render: int
-    reps: int
+# Note entry format for use in the cache.
+class CachedNoteEntry:
 
-    def __init__(self, id, renders, reps, last_used_render) -> None:
-        self.id = id
-        self.last_used_render = last_used_render
-        self.renders = renders
-        self.reps = reps
+    def _find_card_at_ord(self, ord: int):
+        cards = self.note.cards()
+        for card in cards:
+            if card.ord == ord: return card
+        raise ValueError(f'Card with ord {ord} does not exist in cached entry for note {self.note.id}.')
+
+    def get_render(self, idx: int, ord: int = 0) -> TemplateRenderOutput:
+        note = Note(col=self.note.col, id=self.note.id)
+        note.fields[0] = self.texts[idx]
+        return note.ephemeral_card(
+            ord=ord,
+            custom_note_type=note.note_type(),
+            custom_template=self._find_card_at_ord(ord).template()
+        ).render_output()
+
+    def __init__(self, note: Note, texts: List[str]) -> None:
+        self.note = note
+        self.texts = texts
+        self.last_renders = {}
+        self.reps = {}
+        self.last_overall_render = None
 
     def __str__(self):
-        return (f'[Cached card {self.id}: {self.reps} recorded reps, last used render '
-                f'{self.last_used_render} (zero-indexed) of {len(self.renders)} total renders]')
+        return (f'[Cached note {self.note.id}, texts ({len(self.texts)} total): {self.texts}, reps: {self.reps}, last renders: {self.last_renders}, last overall render: {self.last_overall_render}]')
 
 # Keypress event that will be used for removing faulty revisions of a card.
 class KeyPressCacheClearFilter(QObject):
@@ -233,10 +229,10 @@ class KeyPressCacheClearFilter(QObject):
             pressed_key = QKeySequence(key_combination).toString()
             if pressed_key == config.settings.shortcut_clear_current_card:
                 curr_card = mw.reviewer.card
-                if curr_card is not None and curr_card.id in config.data.keys():
-                    clear_card_from_cache(curr_card)
+                if curr_card is not None and curr_card.note().id in config.data.keys():
+                    clear_parent_note_of_card_from_cache(curr_card)
                 else:
-                    tooltip('No card to clear from dynamic cache.')
+                    tooltip('No note to clear from dynamic cache.')
                 # Fix bug: hitting any cache clear keys should trigger a redraw in case card isn't drawing right
                 if mw.reviewer.card is not None:
                     mw.reviewer._redraw_current_card()
@@ -263,93 +259,75 @@ class KeyPressCacheClearFilter(QObject):
 
         return super().eventFilter(obj, event)
 
-def poll_cached_card(card: Card) -> CachedCardEntry:
-    if card.id not in config.data.keys():
-        cached_card = get_all_by_id(card.id)
-        if cached_card:
+def poll_cached_note_for_card(card: Card) -> CachedNoteEntry:
+    note = card.note()
+    if note.id in config.data.keys():
+        if config.debug: print(f'Cached note entry exists for note {note.id}.')
+        cne = config.data[note.id]
+        if card.ord not in config.data[note.id].reps.keys():
+            if config.debug: print(f'Added rep information for ord {card.ord} to cached note {note.id}.')
+            cne.reps[card.ord] = card.reps
+        if card.ord not in config.data[note.id].last_renders.keys():
+            if config.debug: print(f'Added last render information for ord {card.ord} to cached note {note.id}.')
+            cne.last_renders[card.ord] = 0
+    else:
+        cached_note = get_all_by_id(note.id)
+        if cached_note:
             if config.debug:
-                print(f'Cached card entry for card id {card.id} exists in the dynamic database, retrieving it.')
-            texts, last_render = cached_card
-            renders = [create_new_manual_cached_render(card, text) for text in texts] # might be slow especially with many renders!
-            config.data[card.id] = CachedCardEntry(id=card.id,
-                                                    renders=renders,
-                                                    reps=card.reps,
-                                                    last_used_render=last_render)
+                print(f'Cached note entry for note {note.id} exists in the dynamic database, retrieving it.')
+            texts, last_renders = cached_note
+            cne = CachedNoteEntry(note=note, texts=texts)
+            cne.last_renders = last_renders
+            cne.reps[card.ord] = card.reps
+            config.data[note.id] = cne
         else:
             if config.debug:
-                print(f'Cached card entry for card id {card.id} does not exist; creating a new one.')
-            config.data[card.id] = CachedCardEntry(id=card.id,
-                                                   renders=[card.render_output()],
-                                                   reps=card.reps,
-                                                   last_used_render=0)
-            set_all_by_id(id_val=card.id, strings=[card.note().fields[0]], last_render=0) # Create a new entry in the database with the current text.
-    elif config.debug:
-        print(f'Cached card entry exists for {card.id}.')
-    cce = config.data[card.id]
-    if config.debug:
-        print(f'Retrieved cached card entry {cce}.')
-    return cce
+                print(f'Cached note entry for note id {note.id} does not exist; creating a new one.')
+            cne = CachedNoteEntry(note=note, texts=[note.fields[0]])
+            cne.last_renders[card.ord] = 0
+            cne.reps[card.ord] = card.reps
+            config.data[note.id] = cne
+            set_all_by_id(id_val=note.id, strings=[note.fields[0]], last_renders=cne.last_renders) # Create a new entry in the database with the current text.
+    if config.debug: print(f'Retrieved cached note entry {cne}.')
+    return cne
 
-def update_cached_card(card: Card,
-                       reps: Optional[int] = None,
-                       last_used_render: Optional[int] = None,
-                       new_render: Optional[TemplateRenderOutput] = None,
-                       new_text: Optional[str] = None) -> CachedCardEntry:
+def update_cached_note_for_card(card: Card,
+                            reps: Optional[int] = None,
+                            last_used_render: Optional[int] = None,
+                            new_text: Optional[str] = None) -> CachedNoteEntry:
     
     # Set card intrinsic props.
-    cce = poll_cached_card(card)
+    cne = poll_cached_note_for_card(card)
 
     if reps is not None:
         # cce id should match card id already.
-        cce.reps = reps
-        if config.debug: print(f'Updated reps for card {card.id}:', str(cce))
-    if new_render is not None:
-        assert new_text is not None, 'New render text must be supplied (not None) for dynamic database caching.'
-        cce.renders += [new_render]
-        append_string_by_id(card.id, new_text)
-        if config.debug: print(f'Added render for card {card.id}:', str(cce))
-    if last_used_render is not None:
-        assert last_used_render >= 0 and last_used_render < len(cce.renders)
-        cce.last_used_render = last_used_render
-        set_last_render_by_id(card.id, last_used_render)
-        if config.debug: print(f'Updated last used render for card {card.id}:', str(cce))
-
-    config.data[card.id] = cce
-    return cce
-
-def create_new_dynamic_cached_render(card: Card, return_text: bool = False):
-    # print('Making a new cached render for card ' + str(card.id))
-    # print('API KEY: ' + api_key)
-    ord = card.ord
-    note = card.note()
-    note = Note(col=note.col, id=note.id)
-    if config.debug: print(f'Creating new dynamic render for card {card.id} using model \'{config.settings.model}\'')
-    
-    new_text = reword_card(card)
+        cne.reps[card.ord] = reps
+        if config.debug: print(f'Updated reps for note {cne.note.id}, ord {card.ord}:', str(cne))
     if new_text is not None:
-        if config.debug: print(f'Successfully created new dynamic render for card {card.id} using model \'{config.settings.model}\'')
-        note.fields[0] = new_text
-        new_render = note.ephemeral_card(ord=ord, custom_note_type=note.note_type(), custom_template=card.template()).render_output()
-    else:
-        if config.debug: print(f'Unsuccessfully attempted new dynamic render for card {card.id} using model \'{config.settings.model}\'')
-        new_render = None
-        
-    if return_text:
-        return new_render, new_text
-    return new_render
+        cne.texts += [new_text]
+        set_all_by_id(id_val=cne.note.id,
+                      strings=cne.texts,
+                      last_renders=cne.last_renders)
+        if config.debug: print(f'Added render for note {cne.note.id}, ord {card.ord}:', str(cne))
+    if last_used_render is not None:
+        assert last_used_render >= 0 and last_used_render < len(cne.texts)
+        cne.last_renders[card.ord] = last_used_render
+        set_last_renders_by_id(id_val=cne.note.id, last_renders=cne.last_renders)
+        if config.debug: print(f'Updated last used render for note {cne.note.id}, ord {card.ord}:', str(cne))
 
-def create_new_manual_cached_render(card: Card, text: Optional[str] = None, return_text: bool = False):
+    config.data[cne.note.id] = cne
+    return cne
+
+def create_new_dynamic_wording(note: Note, ord: Optional[int] = None):
     # print('Making a new cached render for card ' + str(card.id))
     # print('API KEY: ' + api_key)
-    ord = card.ord
-    note = card.note()
-    note = Note(col=note.col, id=note.id)
-    if text: note.fields[0] = text
-    if config.debug: print(f'Successfully created new manual render for card {card.id}')
-    new_render = note.ephemeral_card(ord=ord, custom_note_type=note.note_type(), custom_template=card.template()).render_output()
-    if return_text:
-        return new_render, text
-    return new_render
+    if config.debug: print(f'Creating new dynamic wording for note {note.id} using model \'{config.settings.model}\'')
+    
+    new_text = reword_note(note, ord=ord)
+    if config.debug:
+        if new_text is not None: print(f'Successfully created new dynamic wording for note {note.id} using model \'{config.settings.model}\'')
+        else: print(f'Unsuccessfully attempted new dynamic wording for note {note.id} using model \'{config.settings.model}\'')
+    return new_text
 
 def randint_try_norepeat(a, b, last_draw):
     v = randint(a, b)
@@ -357,17 +335,15 @@ def randint_try_norepeat(a, b, last_draw):
         v = v - 1 if v > 0 else v + 1
     return v
 
-# Clear cache, either entirely or for a specific card.
-def clear_card_from_cache(card: Card):
-    if card is not None and card.id in config.data.keys():
-        del config.data[card.id]
-        clear_strings_by_id(card.id)
-        tooltip(f'Cleared card {card.id} from dynamic cache.')
+# Clear cache, either entirely or for a specific note (possibly associated with a card).
+def clear_parent_note_of_card_from_cache(card: Card):
+    if card is not None:
+        clear_note_from_cache(note=card.note())
         
 def clear_note_from_cache(note: Note):
     if note is not None:
-        for card in note.cards():
-            clear_card_from_cache(card)
+        del config.data[note.id]
+        clear_all_by_id(note.id)
         tooltip(f'Cleared dynamic cache for cards associated with note {note.id}.')
 
 def clear_cache():
@@ -392,22 +368,21 @@ def get_cloze_matches(curr_qtext, ord) -> list[str]:
 
 # Ensure all cloze deletions are in curr_qtext.
 # Case insensitive.
-def validate_cloze_card(curr_qtext: str, cloze_deletions: list[Optional[str]]) -> bool:
+def validate_cloze(curr_qtext: str, cloze_deletions: list[Optional[str]]) -> bool:
     for cloze_deletion in cloze_deletions:
         if cloze_deletion.lower() not in curr_qtext.lower():
             return False
     return True
 
-def reword_card(curr_card: Card, num_retries: int = config.settings.num_retries, reason: Optional[str] = None) -> str:
+def reword_note(note: Note, ord: Optional[int] = None, num_retries: int = config.settings.num_retries, reason: Optional[str] = None) -> str:
 
     # Extract relevant properties from the card.
-    curr_qtext = reworded_qtext = curr_card.note().fields[0]
-    curr_ord = curr_card.ord
-    curr_card_type = curr_card.note().note_type()['name']
+    curr_qtext = reworded_qtext = note.fields[0]
+    curr_note_type = note.note_type()['name']
     
     # If we've run out of tries, then give up.
     if num_retries < 0:
-        tooltip(f'Could not properly reword card {curr_card.id} using platform {config.settings.platform_index} (reason: {reason}). Please try again.') 
+        tooltip(f'Could not properly reword note {note.id} using platform {config.settings.platform_index} (reason: {reason}). Please try again.') 
         return None
 
     try:
@@ -416,17 +391,17 @@ def reword_card(curr_card: Card, num_retries: int = config.settings.num_retries,
         elif config.settings.platform_index == 1:
             reworded_qtext = reword_text_gemini(curr_qtext)
         else:
-            raise RuntimeError(f'Unknown platform index {config.settings.platform_index} for rewording card {curr_card.id}.')
+            raise RuntimeError(f'Unknown platform index {config.settings.platform_index} for rewording note {note.id}.')
     except RuntimeError as e:
         time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
-        return reword_card(curr_card, num_retries - 1, reason=str(e))
+        return reword_note(note, num_retries - 1, reason=str(e))
     
-    # If the card is cloze-adjacent, then validate it. If valid, return the card.
-    # If not cloze-adjacent, skip this validation process and just return the card.
+    # If the note is cloze-adjacent, then validate it. If valid, return the note.
+    # If not cloze-adjacent, skip this validation process and just return the note.
     # BUG: This ONLY goes by name. There must be a better way to validate it.
-    if 'cloze' in curr_card_type.lower() and not validate_cloze_card(reworded_qtext, get_cloze_matches(curr_qtext, curr_ord)):
+    if 'cloze' in curr_note_type.lower() and ord is not None and not validate_cloze(reworded_qtext, get_cloze_matches(curr_qtext, ord)):
         time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
-        return reword_card(curr_card, num_retries - 1, reason='Cloze validation failed')
+        return reword_note(note, num_retries - 1, reason='Cloze validation failed')
     return reworded_qtext
         
 def reword_text_mistral(curr_qtext: str) -> str: 
@@ -499,32 +474,34 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
 
         # Poll the cached card.
         # This will set the number of reps of any new card to 0.
-        cce = poll_cached_card(card)
+        cne = poll_cached_note_for_card(card)
         # print('Last used render: %d of %d (at that time)' % (cce.last_used_render + 1, len(cce.renders)))
 
         # If the rep state hasn't changed since last time, then use the last render. Don't change.
-        if cce.reps <= card.reps:
+        if cne.reps[card.ord] <= card.reps:
 
             # Otherwise, make a new request in the background and set the new render to use.
-            if (not config.pause and len(cce.renders) < config.settings.max_renders and 
+            if (not config.pause and len(cne.texts) < config.settings.max_renders and 
                 card.note().note_type()['name'] not in config.settings.exclude_note_types):
-                if config.debug: print(f'Creating new render for card {card.id}, current cache: ', str(cce))
+                if config.debug: print(f'Creating new render for note {cne.note.id}, current cache: ', str(cne))
                 q.add_render_task(card=card)
             randint_fn = randint_try_norepeat if config.settings.max_renders > 1 else lambda a, b, c: 0
-            cce.last_used_render = randint_fn(0, len(cce.renders) - 1, cce.last_used_render)
+            last_render_to_avoid = cne.last_overall_render if cne.last_overall_render is not None else cne.last_renders[card.ord]
+            cne.last_renders[card.ord] = randint_fn(0, len(cne.texts) - 1, last_render_to_avoid)
 
             # Update the cache reps.
             # BUG: Will freeze card updates if it is undone multiple times in one "undo chain."
             # Eventually this will be fixed, or the user can clear the cache on a card manually.
             # This issue should not occur in everyday usage though.
-            update_cached_card(card, reps=cce.reps+1, last_used_render=cce.last_used_render)
+            update_cached_note_for_card(card, reps=cne.reps[card.ord]+1, last_used_render=cne.last_renders[card.ord])
 
         # Set the current render.
-        curr_render = cce.renders[cce.last_used_render]
+        curr_render = cne.get_render(idx=cne.last_renders[card.ord], ord=card.ord)
+        cne.last_overall_render = cne.last_renders[card.ord]
         card.set_render_output(curr_render)
         if config.debug:
-            print(f'Using render {cce.last_used_render} (zero-indexed) for card {card.id}')
-            print(f'CCE: {cce}')
+            print(f'Using render {cne.last_renders[card.ord]} (zero-indexed) for note {cne.note.id}, ord {card.ord}')
+            print(f'Cached reps: {cne.reps[card.ord]}')
             print(f'True (card) reps: {card.reps}')
 
         # print(cce)
@@ -568,7 +545,7 @@ def inject_clear_current_card_option(r: Reviewer, m: QMenu) -> None:
     a = m.addAction('Clear current card from cache')
     a.setShortcut(config.settings.shortcut_clear_current_card)
     if mw.reviewer:
-        def fn(): clear_card_from_cache(mw.reviewer.card)
+        def fn(): clear_parent_note_of_card_from_cache(mw.reviewer.card)
         qconnect(a.triggered, fn)
 
 def inject_clear_all_cards_option(r: Reviewer, m: QMenu) -> None:

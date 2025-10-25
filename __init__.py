@@ -8,7 +8,7 @@ from aqt.utils import tooltip as tooltip_aqt
 from anki.cards import Card
 from anki.notes import Note
 from anki.template import TemplateRenderOutput
-from random import randint
+from random import choice
 import requests
 import json
 import re
@@ -329,12 +329,6 @@ def create_new_dynamic_wording(note: Note, ord: Optional[int] = None):
         else: print(f'Unsuccessfully attempted new dynamic wording for note {note.id} using model \'{config.settings.model}\'')
     return new_text
 
-def randint_try_norepeat(a, b, last_draw):
-    v = randint(a, b)
-    if v == last_draw and a != b:
-        v = v - 1 if v > 0 else v + 1
-    return v
-
 # Clear cache, either entirely or for a specific note (possibly associated with a card).
 def clear_parent_note_of_card_from_cache(card: Card):
     if card is not None:
@@ -485,9 +479,12 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
                 card.note().note_type()['name'] not in config.settings.exclude_note_types):
                 if config.debug: print(f'Creating new render for note {cne.note.id}, current cache: ', str(cne))
                 q.add_render_task(card=card)
-            randint_fn = randint_try_norepeat if config.settings.max_renders > 1 else lambda a, b, c: 0
+                
+            # Try to select a render that is different from the previous one (or just select the only one available)
             last_render_to_avoid = cne.last_overall_render if cne.last_overall_render is not None else cne.last_renders[card.ord]
-            cne.last_renders[card.ord] = randint_fn(0, len(cne.texts) - 1, last_render_to_avoid)
+            choices = set(cne.last_renders.keys())
+            choices = list(choices.difference(set([last_render_to_avoid]))) if len(choices) > 1 else list(choices)           
+            cne.last_renders[card.ord] = choice(choices)
 
             # Update the cache reps.
             # BUG: Will freeze card updates if it is undone multiple times in one "undo chain."

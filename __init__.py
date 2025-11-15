@@ -1,9 +1,8 @@
-from typing import Callable, Collection, Optional, Sequence, Tuple, List
-from aqt import QEvent, QObject, Qt, mw, gui_hooks, QMenu
-from aqt.qt import QWidget, QAction, QDialog, qconnect, QKeySequence, QKeyCombination, QApplication
+from typing import Callable, Optional, Tuple, List
+from aqt import QEvent, QObject, mw, gui_hooks, QMenu
+from aqt.qt import QAction, qconnect, QKeySequence
 from aqt.editor import Editor, EditorMode
 from aqt.reviewer import Reviewer
-from aqt.operations import QueryOp
 from aqt.utils import tooltip as tooltip_aqt
 from anki.cards import Card
 from anki.notes import Note
@@ -13,7 +12,6 @@ import requests
 import json
 import re
 import time
-import os
 
 # Multitasking
 import queue
@@ -29,10 +27,13 @@ from .config import Config
 # TO DO:
 # * PRETTIFY FUNCTION NAMES
 # * ORGANIZE CODE INTO SEPARATE FILES (SQL, ETC.) 
+# * MAKE INTUITIVE ERROR MESSAGES FOR RATE LIMITS
+# * STORE AND AUTOSWITCH API KEYS BASED ON RATE LIMITS
+# * CLEAN UI ON MACOS
 
 # Create global variables.
 config_dict = mw.addonManager.getConfig(__name__)
-config = Config(mw.addonManager, __name__, debug = True)
+config = Config(mw.addonManager, __name__, debug = False)
 
 # CACHING
 
@@ -343,7 +344,7 @@ def clear_parent_note_of_card_from_cache(card: Card, indicate_error: bool = Fals
         clear_note_from_cache(note=card.note(), indicate_error=indicate_error)
         
 def clear_note_from_cache(note: Note, indicate_error: bool = False):
-    if note is not None:
+    if note is not None and note.id in config.data.keys():
         del config.data[note.id]
         clear_all_by_id(note.id)
         if indicate_error:
@@ -499,7 +500,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
                     print('Card to inject:', card, f'(id {card.id}, ord {card.ord})')
                     print('CNE to use:', cne)
                 last_render_to_avoid = cne.last_overall_render if cne.last_overall_render is not None else cne.last_renders[card.ord]
-                choices = set(cne.last_renders.keys())
+                choices = set(range(len(cne.texts)))
                 choices = list(choices.difference(set([last_render_to_avoid]))) if len(choices) > 1 else list(choices)           
                 cne.last_renders[card.ord] = choice(choices)
 
@@ -517,7 +518,7 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
                 print(f'Using render {cne.last_renders[card.ord]} (zero-indexed) for note {cne.note.id}, ord {card.ord}')
                 print(f'Cached reps: {cne.reps[card.ord]}')
                 print(f'True (card) reps: {card.reps}')
-        except (KeyError, IndexError) as e:
+        except (KeyError, TypeError, IndexError) as e:
             if config.debug: print(f'Error on injecting wording for card {card.id}:', e)
             clear_parent_note_of_card_from_cache(card, indicate_error=True)
 

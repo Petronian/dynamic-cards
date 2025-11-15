@@ -1,9 +1,5 @@
 # Dynamic Cards
 
-> [!CAUTION]
-> For some reason, I have been locked out of updating the Anki Addons page.
-> I will update the extension as soon as possible with the most recent fix.
-
 Hate when you memorize the wording of an Anki card rather than the card's
 content? Introducing the **Dynamic Cards** plugin, a small plugin
 that allows Anki to ping LLMs to slightly change the content of your cards
@@ -104,8 +100,8 @@ settings within the Settings menu.
   rate-limited by LLM APIs; this has therefore been set to 1.0 seconds by
   default.
 * **Clear cache on review end:** By default, any card rewordings that
-  you create are cleared when you stop reviewing. Uncheck this option
-  to allow rewordings to persist until you close Anki.
+  you create are preserved even after you stop reviewing. Check this option
+  to clear all rewordings once you stop a review session.
 * **Excluded note types:** A list of all note types that have been excluded
   so far. Double-click any note type to remove it from the list (and thus
   resume dynamic generation again for it).

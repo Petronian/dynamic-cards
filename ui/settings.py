@@ -11,6 +11,31 @@
 from aqt.qt import *
 
 PLATFORMS = ["Mistral AI (Mistral)", "Gemini (Google)"]
+MISTRAL_MODELS = [
+    "mistral-small-latest",
+    "mistral-medium-latest",
+    "mistral-large-latest",
+    "ministral-3b-latest",
+    "ministral-8b-latest",
+    "ministral-14b-latest",
+    "open-mistral-nemo",
+    "open-mixtral-8x7b",
+    "open-mixtral-8x22b",
+]
+GEMINI_MODELS = [
+    "gemini-flash-lite-latest",
+    "gemini-flash-latest",
+    "gemini-pro-latest",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-pro-preview",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash-lite"
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+]
+
+MODELS = [MISTRAL_MODELS, GEMINI_MODELS]
 
 class Ui_Dialog(object):
     def setupUi(self, Dialog: QDialog):
@@ -144,10 +169,11 @@ class Ui_Dialog(object):
 
         self.formLayout.setWidget(2, QFormLayout.ItemRole.LabelRole, self.mistralModelLabel)
 
-        self.modelLineEdit = QLineEdit(self.verticalLayoutWidget)
-        self.modelLineEdit.setObjectName(u"mistralModelLineEdit")
+        self.modelComboBox = QComboBox(self.verticalLayoutWidget)
+        self.modelComboBox.setObjectName(u"modelComboBox")
+        self.modelComboBox.setEditable(False) # consider making True with autocomplete
 
-        self.formLayout.setWidget(2, QFormLayout.ItemRole.FieldRole, self.modelLineEdit)
+        self.formLayout.setWidget(2, QFormLayout.ItemRole.FieldRole, self.modelComboBox)
 
         self.textEdit = QTextEdit(self.verticalLayoutWidget)
         self.textEdit.setObjectName(u"textEdit")
@@ -252,6 +278,7 @@ class Ui_Dialog(object):
         self.buttonBox.accepted.connect(Dialog.accept)
         self.buttonBox.rejected.connect(Dialog.reject)
 
+        self.platformSelect.currentIndexChanged.connect(self.update_models)
         QMetaObject.connectSlotsByName(Dialog)
         self._fitToScreen(Dialog)
 
@@ -263,6 +290,13 @@ class Ui_Dialog(object):
                 print(f'Removed item {item}')
                 break
             ctr = ctr + 1
+
+    def update_models(self, index: int):
+        current_model = self.modelComboBox.currentText()
+        self.modelComboBox.clear()
+        self.modelComboBox.addItems(MODELS[index])
+        if current_model in MODELS[index]:
+            self.modelComboBox.setCurrentText(current_model)
 
     def _fitToScreen(self, Dialog: QDialog):
         max_width = 980

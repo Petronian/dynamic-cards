@@ -12,7 +12,8 @@ class WelcomeDialog(QDialog):
         super().__init__(parent)
         self.form = WelcomeUI()
         self.form.setupUi(self)
-        self.setWindowModality(Qt.WindowModality.WindowModal)
+        self.setWindowModality(Qt.WindowModality.NonModal)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.form.checkBox.setChecked(show_modal)
         
 class SettingsDialog(QDialog):
@@ -35,13 +36,16 @@ class SettingsDialog(QDialog):
         self.form.keySequenceEdit_3.setKeySequence(str(self.settings.shortcut_include_exclude))
         self.form.keySequenceEdit_4.setKeySequence(str(self.settings.shortcut_pause))
         self.form.APIKeyLineEdit.setText(str(self.settings.api_key))
-        self.form.modelLineEdit.setText(str(self.settings.model))
         self.form.maxRendersLineEdit.setText(str(self.settings.max_renders))
         self.form.textEdit.setText(str(self.settings.context))
         self.form.retryCountLineEdit.setText(str(self.settings.num_retries))
         self.form.retryDelayLineEdit.setText(str(self.settings.retry_delay_seconds))
         self.form.checkBox.setChecked(bool(self.settings.clear_cache_on_reviewer_end))
         self.form.platformSelect.setCurrentIndex(int(self.settings.platform_index))
+        
+        # This will trigger update_models, populating the model list.
+        # Then we set the current model.
+        self.form.modelComboBox.setCurrentText(str(self.settings.model))
 
         # Set the excluded types.
         self.form.listWidget.clear()

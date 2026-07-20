@@ -622,7 +622,7 @@ def update_config_settings():
     config.settings.shortcut_include_exclude = sdlg.form.keySequenceEdit_3.keySequence().toString()
     config.settings.shortcut_pause = sdlg.form.keySequenceEdit_4.keySequence().toString()
     config.settings.api_key = sdlg.form.APIKeyLineEdit.text()
-    config.settings.model = sdlg.form.modelLineEdit.text()
+    config.settings.model = sdlg.form.modelComboBox.currentText()
     config.settings.context = sdlg.form.textEdit.toPlainText()
     config.settings.clear_cache_on_reviewer_end = sdlg.form.checkBox.isChecked()
     config.settings.exclude_note_types = [sdlg.form.listWidget.item(i).text() for i in range(sdlg.form.listWidget.count())]

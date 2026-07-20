@@ -33,7 +33,7 @@ from .config import Config
 
 # Create global variables.
 config_dict = mw.addonManager.getConfig(__name__)
-config = Config(mw.addonManager, __name__, debug = True)
+config = Config(mw.addonManager, __name__, debug = False)
 
 # CACHING
 

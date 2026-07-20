@@ -33,7 +33,7 @@ from .config import Config
 
 # Create global variables.
 config_dict = mw.addonManager.getConfig(__name__)
-config = Config(mw.addonManager, __name__, debug = False)
+config = Config(mw.addonManager, __name__, debug = True)
 
 # CACHING
 
@@ -146,6 +146,8 @@ class RewordingWorkerQueue:
         if config.debug: tooltip('Queue initialized.')
 
     # Start the worker queue if not already started.
+    # Starting a stopped Queue will create a new Queue object; no leftover tasks will be performed first,
+    # making for instant rewording capability.
     def start(self):
         if not self.running:
             self.queue = queue.Queue()
@@ -158,12 +160,16 @@ class RewordingWorkerQueue:
     # Do so one-by-one to avoid throttling!
     def worker(self):
         while self.running:
-            if self.queue.empty():
-                time.sleep(0.5)
-            else:
-                func, args = self.queue.get()
+            try:
+                # Block for a maximum of 0.5 seconds.
+                func, args = self.queue.get(timeout=0.5)
+                if func is None: # Dummy item from stop()
+                    continue
                 func(args)
                 self.queue.task_done()
+            except queue.Empty:
+                # Queue was empty, loop again to check self.running.
+                continue
 
     # Task helper method
     def _task_helper(self, card: Card):
@@ -184,18 +190,26 @@ class RewordingWorkerQueue:
 
     # Stop the queue.
     def stop(self):
+        if not self.running:
+            return
         self.running = False
-        self.worker_thread.join()
-        del self.queue
-        del self.worker_thread
-        self.queue = None
-        self.worker_thread = None
+        
+        # Put a dummy item in the queue to unblock the worker if it's waiting
+        # on an empty queue. This allows it to check `self.running` and exit.
+        # If restarted, the current queue will be discarded; thus, this extra
+        # dummy task is not a problem.
+        try:
+            if self.queue:
+                self.queue.put_nowait((None, None))
+        except (queue.Full, AttributeError):
+            # Queue might be full or already gone, which is fine.
+            pass
+        
         if config.debug: tooltip(f'Queue stopped.')
-        # Need to unblock?
 
     # Reset the queue and have it start running again.
-    def reset(self, immediate=False):
-        self.stop(immediate=immediate)
+    def reset(self):
+        self.stop()
         self.start()
         if config.debug: tooltip(f'Queue reset.')
 
@@ -230,7 +244,7 @@ class CachedNoteEntry:
 # Keypress event that will be used for removing faulty revisions of a card.
 class KeyPressCacheClearFilter(QObject):
     def eventFilter(self, obj: object, event: QEvent):
-        if event.type() == QEvent.KeyPress:
+        if event.type() == QEvent.Type.KeyPress:
             key_combination = event.keyCombination()
             pressed_key = QKeySequence(key_combination).toString()
             if pressed_key == config.settings.shortcut_clear_current_card:
@@ -391,7 +405,15 @@ def reword_note(note: Note, ord: Optional[int] = None, num_retries: int = config
         tooltip(f'Could not properly reword note {note.id} using platform {config.settings.platform_index} (reason: {reason}). Please try again.') 
         return None
 
+    # This is the choke point for the rewording process. If the queue is not running (because the user has killed it),
+    # then we should not attempt to reword the note.
+    global q 
+    if q is not None and isinstance(q, RewordingWorkerQueue) and not q.running:
+        if config.debug: print(f'Queue has been closed; aborting rewording for note {note.id}.')
+        return None
+
     try:
+        if config.debug: print(f'Attempting to reword note {note.id} using platform {config.settings.platform_index} (reason: {reason}).')
         if config.settings.platform_index == 0:
             reworded_qtext = reword_text_mistral(curr_qtext)
         elif config.settings.platform_index == 1:
@@ -400,8 +422,9 @@ def reword_note(note: Note, ord: Optional[int] = None, num_retries: int = config
             raise RuntimeError(f'Unknown platform index {config.settings.platform_index} for rewording note {note.id}.')
     except RuntimeError as e:
         time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        if config.debug: print(f'Failed to reword note {note.id} using platform {config.settings.platform_index} (reason: {str(e)}).')
         return reword_note(note, num_retries - 1, reason=str(e))
-    
+
     # If the note is cloze-adjacent, then validate it. If valid, return the note.
     # If not cloze-adjacent, skip this validation process and just return the note.
     # BUG: This ONLY goes by name. There must be a better way to validate it.

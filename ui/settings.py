@@ -9,33 +9,7 @@
 ################################################################################
 
 from aqt.qt import *
-
-PLATFORMS = ["Mistral AI (Mistral)", "Gemini (Google)"]
-MISTRAL_MODELS = [
-    "mistral-small-latest",
-    "mistral-medium-latest",
-    "mistral-large-latest",
-    "ministral-3b-latest",
-    "ministral-8b-latest",
-    "ministral-14b-latest",
-    "open-mistral-nemo",
-    "open-mixtral-8x7b",
-    "open-mixtral-8x22b",
-]
-GEMINI_MODELS = [
-    "gemini-flash-lite-latest",
-    "gemini-flash-latest",
-    "gemini-pro-latest",
-    "gemini-3.5-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3.1-pro-preview",
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash-lite"
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-]
-
-MODELS = [MISTRAL_MODELS, GEMINI_MODELS]
+from ..config import PLATFORMS, MODELS
 
 class Ui_Dialog(object):
     def setupUi(self, Dialog: QDialog):
@@ -275,6 +249,7 @@ class Ui_Dialog(object):
 
 
         self.retranslateUi(Dialog)
+        self.dialog = Dialog  # Store a reference to the parent dialog
         self.buttonBox.accepted.connect(Dialog.accept)
         self.buttonBox.rejected.connect(Dialog.reject)
 
@@ -291,12 +266,39 @@ class Ui_Dialog(object):
                 break
             ctr = ctr + 1
 
-    def update_models(self, index: int):
-        current_model = self.modelComboBox.currentText()
+    def update_models(self, new_index: int):
+        # This function is now responsible for all platform-specific settings
+        
+        # 1. Save settings for the *previous* platform before switching
+        # The check for `self.modelComboBox.count() > 0` prevents saving empty
+        # data when the dialog is first loading.
+        if self.modelComboBox.count() > 0:
+            previous_index = 1 - new_index
+            prev_platform_settings = self.dialog.settings.platform_configs[previous_index]
+
+            prev_platform_settings["api_key"] = self.APIKeyLineEdit.text()
+            prev_platform_settings["model"] = self.modelComboBox.currentText()
+            prev_platform_settings["context"] = self.textEdit.toPlainText()
+            try:
+                prev_platform_settings["max_renders"] = int(self.maxRendersLineEdit.text())
+                prev_platform_settings["num_retries"] = int(self.retryCountLineEdit.text())
+                prev_platform_settings["retry_delay_seconds"] = float(self.retryDelayLineEdit.text())
+            except ValueError:
+                # Silently ignore invalid values on switch; they'll be handled on 'OK'
+                pass
+
+        # 2. Load settings for the *new* platform
+        new_platform_settings = self.dialog.settings.platform_configs[new_index]
+
         self.modelComboBox.clear()
-        self.modelComboBox.addItems(MODELS[index])
-        if current_model in MODELS[index]:
-            self.modelComboBox.setCurrentText(current_model)
+        self.modelComboBox.addItems(MODELS[new_index])
+        
+        self.APIKeyLineEdit.setText(new_platform_settings.get("api_key", ""))
+        self.modelComboBox.setCurrentText(new_platform_settings.get("model", ""))
+        self.textEdit.setText(new_platform_settings.get("context", ""))
+        self.maxRendersLineEdit.setText(str(new_platform_settings.get("max_renders", 3)))
+        self.retryCountLineEdit.setText(str(new_platform_settings.get("num_retries", 3)))
+        self.retryDelayLineEdit.setText(str(new_platform_settings.get("retry_delay_seconds", 1.0)))
 
     def _fitToScreen(self, Dialog: QDialog):
         max_width = 980

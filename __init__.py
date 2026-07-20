@@ -21,8 +21,8 @@ import threading
 import sqlite3
 
 # Local imports
-from .dialog import WelcomeDialog, SettingsDialog
 from .config import Config
+from .dialog import WelcomeDialog, SettingsDialog
 
 # TO DO:
 # * PRETTIFY FUNCTION NAMES
@@ -230,7 +230,7 @@ class CachedNoteEntry:
 # Keypress event that will be used for removing faulty revisions of a card.
 class KeyPressCacheClearFilter(QObject):
     def eventFilter(self, obj: object, event: QEvent):
-        if event.type() == QEvent.KeyPress:
+        if event.type() == QEvent.Type.KeyPress:
             key_combination = event.keyCombination()
             pressed_key = QKeySequence(key_combination).toString()
             if pressed_key == config.settings.shortcut_clear_current_card:
@@ -329,13 +329,15 @@ def update_cached_note_for_card(card: Card,
 
 def create_new_dynamic_wording(note: Note, ord: Optional[int] = None):
     # print('Making a new cached render for card ' + str(card.id))
-    # print('API KEY: ' + api_key)
-    if config.debug: print(f'Creating new dynamic wording for note {note.id} using model \'{config.settings.model}\'')
+    platform_index = config.settings.platform_index
+    platform_settings = config.settings.platform_configs[platform_index]
+    model = platform_settings.get("model")
+    if config.debug: print(f'Creating new dynamic wording for note {note.id} using model \'{model}\'')
     
     new_text = reword_note(note, ord=ord)
     if config.debug:
-        if new_text is not None: print(f'Successfully created new dynamic wording for note {note.id} using model \'{config.settings.model}\'')
-        else: print(f'Unsuccessfully attempted new dynamic wording for note {note.id} using model \'{config.settings.model}\'')
+        if new_text is not None: print(f'Successfully created new dynamic wording for note {note.id} using model \'{model}\'')
+        else: print(f'Unsuccessfully attempted new dynamic wording for note {note.id} using model \'{model}\'')
     return new_text
 
 # Clear cache, either entirely or for a specific note (possibly associated with a card).
@@ -380,7 +382,12 @@ def validate_cloze(curr_qtext: str, cloze_deletions: list[Optional[str]]) -> boo
             return False
     return True
 
-def reword_note(note: Note, ord: Optional[int] = None, num_retries: int = config.settings.num_retries, reason: Optional[str] = None) -> str:
+def reword_note(note: Note, ord: Optional[int] = None, num_retries: Optional[int] = None, reason: Optional[str] = None) -> str:
+    
+    platform_index = config.settings.platform_index
+    platform_settings = config.settings.platform_configs[platform_index]
+    if num_retries is None:
+        num_retries = platform_settings.get("num_retries", 3)
 
     # Extract relevant properties from the card.
     curr_qtext = reworded_qtext = note.fields[0]
@@ -392,35 +399,40 @@ def reword_note(note: Note, ord: Optional[int] = None, num_retries: int = config
         return None
 
     try:
-        if config.settings.platform_index == 0:
+        if platform_index == 0:
             reworded_qtext = reword_text_mistral(curr_qtext)
-        elif config.settings.platform_index == 1:
+        elif platform_index == 1:
             reworded_qtext = reword_text_gemini(curr_qtext)
         else:
-            raise RuntimeError(f'Unknown platform index {config.settings.platform_index} for rewording note {note.id}.')
+            raise RuntimeError(f'Unknown platform index {platform_index} for rewording note {note.id}.')
     except RuntimeError as e:
-        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        time.sleep(platform_settings.get("retry_delay_seconds", 1.0)) # avoid rate limit ceiling
         return reword_note(note, num_retries - 1, reason=str(e))
     
     # If the note is cloze-adjacent, then validate it. If valid, return the note.
     # If not cloze-adjacent, skip this validation process and just return the note.
     # BUG: This ONLY goes by name. There must be a better way to validate it.
     if 'cloze' in curr_note_type.lower() and ord is not None and not validate_cloze(reworded_qtext, get_cloze_matches(curr_qtext, ord)):
-        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        time.sleep(platform_settings.get("retry_delay_seconds", 1.0)) # avoid rate limit ceiling
         return reword_note(note, num_retries - 1, reason='Cloze validation failed')
     return reworded_qtext
         
 def reword_text_mistral(curr_qtext: str) -> str: 
-       
+    
+    platform_settings = config.settings.platform_configs[0]
+    api_key = platform_settings.get("api_key")
+    model = platform_settings.get("model")
+    context = platform_settings.get("context")
+
     # Try to reword the card using Mistral.
     try:
         chat_response = requests.post(url="https://api.mistral.ai/v1/chat/completions",
                                       headers={'Content-Type': 'application/json',
                                               'Accept': 'application/json',
-                                              'Authorization': 'Bearer ' + config.settings.api_key},
-                                      data=json.dumps({'model': config.settings.model,
+                                              'Authorization': 'Bearer ' + api_key},
+                                      data=json.dumps({'model': model,
                                                        'messages': [
-                                                           {'role': 'system', 'content': config.settings.context},
+                                                           {'role': 'system', 'content': context},
                                                            {'role': 'user', 'content': curr_qtext}
                                                        ]}))
         if not (chat_response.status_code >= 200 and chat_response.status_code < 300):
@@ -429,26 +441,31 @@ def reword_text_mistral(curr_qtext: str) -> str:
     except Exception as e:
         # Throw an error.
         # # print('Error with Mistral. Is your API key working?')
-        raise RuntimeError(f'Error loading \'{config.settings.model}\' for dynamic Anki cards: ' + str(e))
+        raise RuntimeError(f'Error loading \'{model}\' for dynamic Anki cards: ' + str(e))
                           # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
                           # 'If this continues, disable this add-on to stop these messages.')
 
 def reword_text_gemini(curr_qtext: str) -> str: 
-       
+
+    platform_settings = config.settings.platform_configs[1]
+    api_key = platform_settings.get("api_key")
+    model = platform_settings.get("model")
+    context = platform_settings.get("context")
+
     # Try to reword the card using Gemini.
     try:
         chat_response = requests.post(
-            url=f"https://generativelanguage.googleapis.com/v1beta/models/{config.settings.model}:generateContent",
+            url=f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
             headers={
                 'Content-Type': 'application/json',
-                'X-goog-api-key': config.settings.api_key
+                'X-goog-api-key': api_key
             },
             data=json.dumps({
                 'contents': [{
                     'parts': [{'text': curr_qtext}]
                 }],
                 'system_instruction': {
-                    'parts': [{'text': config.settings.context}]
+                    'parts': [{'text': context}]
                 },
                 'generationConfig': {
                     'thinkingConfig': {
@@ -462,7 +479,7 @@ def reword_text_gemini(curr_qtext: str) -> str:
     except Exception as e:
         # Throw an error.
         # # print('Error with Gemini. Is your API key working?')
-        raise RuntimeError(f'Error loading \'{config.settings.model}\' for dynamic Anki cards: ' + str(e))
+        raise RuntimeError(f'Error loading \'{model}\' for dynamic Anki cards: ' + str(e))
                           # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
                           # 'If this continues, disable this add-on to stop these messages.')
 
@@ -488,9 +505,11 @@ def inject_rewording_on_question(text: str, card: Card, kind: str) -> str:
         try:
             # If the rep state hasn't changed since last time, then use the last render. Don't change.
             if cne.reps[card.ord] <= card.reps:
-
+                
+                platform_index = config.settings.platform_index
+                platform_settings = config.settings.platform_configs[platform_index]
                 # Otherwise, make a new request in the background and set the new render to use.
-                if (not config.pause and len(cne.texts) < config.settings.max_renders and 
+                if (not config.pause and len(cne.texts) < platform_settings.get("max_renders", 3) and 
                     card.note().note_type()['name'] not in config.settings.exclude_note_types):
                     if config.debug: print(f'Creating new render for note {cne.note.id}, current cache: ', str(cne))
                     q.add_render_task(card=card)
@@ -621,34 +640,35 @@ def update_config_settings():
     config.settings.shortcut_clear_all_cards = sdlg.form.keySequenceEdit_2.keySequence().toString()
     config.settings.shortcut_include_exclude = sdlg.form.keySequenceEdit_3.keySequence().toString()
     config.settings.shortcut_pause = sdlg.form.keySequenceEdit_4.keySequence().toString()
-    config.settings.api_key = sdlg.form.APIKeyLineEdit.text()
-    config.settings.model = sdlg.form.modelComboBox.currentText()
-    config.settings.context = sdlg.form.textEdit.toPlainText()
     config.settings.clear_cache_on_reviewer_end = sdlg.form.checkBox.isChecked()
     config.settings.exclude_note_types = [sdlg.form.listWidget.item(i).text() for i in range(sdlg.form.listWidget.count())]
     config.settings.platform_index = sdlg.form.platformSelect.currentIndex()
 
-    # Handle max render input
+    # Save platform-specific settings for the currently active platform
+    current_index = config.settings.platform_index
+    current_platform_settings = config.settings.platform_configs[current_index]
+
+    current_platform_settings["api_key"] = sdlg.form.APIKeyLineEdit.text()
+    current_platform_settings["model"] = sdlg.form.modelComboBox.currentText()
+    current_platform_settings["context"] = sdlg.form.textEdit.toPlainText()
+
+    # Handle numeric inputs with validation
     try:
         val = int(sdlg.form.maxRendersLineEdit.text())
         assert val > 0
-        config.settings.max_renders = val
+        current_platform_settings["max_renders"] = val
     except ValueError or AssertionError:
         tooltip(f'Invalid new value \'{sdlg.form.maxRendersLineEdit.text()}\' for max renders; reverting to old value.')
-
-    # Handle num retries input
     try:
         val = int(sdlg.form.retryCountLineEdit.text())
         assert val > 0
-        config.settings.num_retries = val
+        current_platform_settings["num_retries"] = val
     except ValueError or AssertionError:
         tooltip(f'Invalid new value \'{sdlg.form.retryCountLineEdit.text()}\' for retry count; reverting to old value.')
-
-    # Handle retry delay input
     try:
         val = float(sdlg.form.retryDelayLineEdit.text())
         assert val >= 0
-        config.settings.retry_delay_seconds = val
+        current_platform_settings["retry_delay_seconds"] = val
     except ValueError or AssertionError:
         tooltip(f'Invalid new value \'{sdlg.form.retryDelayLineEdit.text()}\' for retry delay; reverting to old value.')
     
@@ -657,9 +677,12 @@ def update_config_settings():
     gui_hooks.reviewer_will_end.remove(clear_cache)
     if config.settings.clear_cache_on_reviewer_end:
         gui_hooks.reviewer_will_end.append(clear_cache)
+    
+    # Trigger a write to disk by re-assigning the list
+    config.settings.platform_configs = config.settings.platform_configs
 
 sdlg.setModal(True)
 sdlg.accepted.connect(update_config_settings)
 config_option = QAction("Dynamic Cards", mw)
-config_option.triggered.connect(sdlg.show)
+config_option.triggered.connect(sdlg.open)
 mw.form.menuTools.addAction(config_option)

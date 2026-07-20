@@ -14,33 +14,43 @@ class Ui_Dialog(object):
     def setupUi(self, Dialog: QDialog):
         if not Dialog.objectName():
             Dialog.setObjectName(u"Dialog")
-        Dialog.resize(519, 400)
-        Dialog.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.verticalLayoutWidget = QWidget(Dialog)
-        self.verticalLayoutWidget.setObjectName(u"verticalLayoutWidget")
-        self.verticalLayoutWidget.setGeometry(QRect(9, 9, 501, 381))
-        self.verticalLayout = QVBoxLayout(self.verticalLayoutWidget)
-        self.verticalLayout.setSpacing(0)
+        Dialog.resize(560, 440)
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        sizePolicy.setHeightForWidth(Dialog.sizePolicy().hasHeightForWidth())
+        Dialog.setSizePolicy(sizePolicy)
+        self.verticalLayout = QVBoxLayout(Dialog)
+        self.verticalLayout.setSpacing(10)
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
-        self.label_3 = QLabel(self.verticalLayoutWidget)
+        self.verticalLayout.setContentsMargins(10, 10, 10, 10)
+        self.scrollArea = QScrollArea(Dialog)
+        self.scrollArea.setObjectName(u"scrollArea")
+        self.scrollArea.setFrameShape(QFrame.Shape.NoFrame)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollAreaWidgetContents = QWidget()
+        self.scrollAreaWidgetContents.setObjectName(u"scrollAreaWidgetContents")
+        self.scrollAreaLayout = QVBoxLayout(self.scrollAreaWidgetContents)
+        self.scrollAreaLayout.setObjectName(u"scrollAreaLayout")
+        self.scrollAreaLayout.setContentsMargins(0, 0, 0, 0)
+        self.label_3 = QLabel(self.scrollAreaWidgetContents)
         self.label_3.setObjectName(u"label_3")
-        sizePolicy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.label_3.sizePolicy().hasHeightForWidth())
-        self.label_3.setSizePolicy(sizePolicy)
         self.label_3.setWordWrap(True)
         self.label_3.setOpenExternalLinks(True)
+        self.label_3.setTextFormat(Qt.TextFormat.RichText)
+        self.label_3.setTextInteractionFlags(
+            Qt.TextInteractionFlag.LinksAccessibleByMouse | Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.scrollAreaLayout.addWidget(self.label_3)
+        self.scrollAreaLayout.addStretch(1)
+        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
 
-        self.verticalLayout.addWidget(self.label_3)
+        self.verticalLayout.addWidget(self.scrollArea)
 
-        self.checkBox = QCheckBox(self.verticalLayoutWidget)
+        self.checkBox = QCheckBox(Dialog)
         self.checkBox.setObjectName(u"checkBox")
 
         self.verticalLayout.addWidget(self.checkBox)
 
-        self.buttonBox = QDialogButtonBox(self.verticalLayoutWidget)
+        self.buttonBox = QDialogButtonBox(Dialog)
         self.buttonBox.setObjectName(u"buttonBox")
         self.buttonBox.setOrientation(Qt.Orientation.Horizontal)
         self.buttonBox.setStandardButtons(QDialogButtonBox.StandardButton.Close)
@@ -54,13 +64,26 @@ class Ui_Dialog(object):
         self.buttonBox.rejected.connect(Dialog.reject)
 
         QMetaObject.connectSlotsByName(Dialog)
-        Dialog.adjustSize()
-        Dialog.setFixedSize(Dialog.size())
+        self._fitToScreen(Dialog)
     # setupUi
+
+    def _fitToScreen(self, Dialog: QDialog):
+        max_width = 900
+        max_height = 700
+        screen = Dialog.screen() or QApplication.primaryScreen()
+        if screen:
+            available = screen.availableGeometry()
+            max_width = min(max_width, int(available.width() * 0.9))
+            max_height = min(max_height, int(available.height() * 0.9))
+
+        Dialog.setMinimumSize(440, 320)
+        Dialog.setMaximumSize(max_width, max_height)
+        Dialog.adjustSize()
+        Dialog.resize(min(Dialog.width(), max_width), min(Dialog.height(), max_height))
 
     # Edit once the Settings menu is created.
     def retranslateUi(self, Dialog):
-        Dialog.setWindowTitle(QCoreApplication.translate("Dialog", u"Dialog", None))
+        Dialog.setWindowTitle(QCoreApplication.translate("Dialog", u"Welcome", None))
         self.label_3.setText(QCoreApplication.translate("Dialog", u"<h1>Welcome to Dynamic Cards!</h1>This extension aims to allow users to memorize card concepts, not card wording, by changing the wording of cards slightly upon each review of the card. Here's how it works:<ol><li>Review any card.</li><li>Dynamic Cards will automatically reword the card for the next review.</li><li>Once the maximum number of rewordings are achieved, rewordings will recycle.</li></ol>That's it! Once the following steps are completed, the extension should begin working automatically:<ol><li>Make a free <a href='https://console.mistral.ai/'>Mistral AI account.</a></li><li>Generate a Mistral API token and enter it in the <i>Tools > Dynamic Cards</i> menu.</li></ol>This plugin has several additional features for ease of use. <b>For full usage instructions, please see <a href='https://github.com/Petronian/dynamic-cards'>here.</a></b>", None))
         self.checkBox.setText(QCoreApplication.translate("Dialog", u"Show this message on every startup", None))
     # retranslateUi

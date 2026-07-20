@@ -16,15 +16,22 @@ class Ui_Dialog(object):
     def setupUi(self, Dialog: QDialog):
         if not Dialog.objectName():
             Dialog.setObjectName(u"Dialog")
-        Dialog.resize(441, 699)
+        Dialog.resize(520, 760)
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(Dialog.sizePolicy().hasHeightForWidth())
         Dialog.setSizePolicy(sizePolicy)
-        self.verticalLayoutWidget = QWidget(Dialog)
+        self.mainLayout = QVBoxLayout(Dialog)
+        self.mainLayout.setObjectName(u"mainLayout")
+        self.mainLayout.setContentsMargins(10, 10, 10, 10)
+        self.mainLayout.setSpacing(10)
+        self.scrollArea = QScrollArea(Dialog)
+        self.scrollArea.setObjectName(u"scrollArea")
+        self.scrollArea.setFrameShape(QFrame.Shape.NoFrame)
+        self.scrollArea.setWidgetResizable(True)
+        self.verticalLayoutWidget = QWidget()
         self.verticalLayoutWidget.setObjectName(u"verticalLayoutWidget")
-        self.verticalLayoutWidget.setGeometry(QRect(10, 10, 421, 680))
         self.verticalLayout = QVBoxLayout(self.verticalLayoutWidget)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
@@ -144,6 +151,7 @@ class Ui_Dialog(object):
 
         self.textEdit = QTextEdit(self.verticalLayoutWidget)
         self.textEdit.setObjectName(u"textEdit")
+        self.textEdit.setMinimumHeight(self.textEdit.fontMetrics().lineSpacing() * 3 + 18)
 
         self.formLayout.setWidget(4, QFormLayout.ItemRole.FieldRole, self.textEdit)
 
@@ -230,12 +238,14 @@ class Ui_Dialog(object):
 
         self.verticalLayout.addItem(self.verticalSpacer_5)
 
-        self.buttonBox = QDialogButtonBox(self.verticalLayoutWidget)
+        self.buttonBox = QDialogButtonBox(Dialog)
         self.buttonBox.setObjectName(u"buttonBox")
         self.buttonBox.setOrientation(Qt.Orientation.Horizontal)
         self.buttonBox.setStandardButtons(QDialogButtonBox.StandardButton.Cancel|QDialogButtonBox.StandardButton.Ok)
 
-        self.verticalLayout.addWidget(self.buttonBox)
+        self.scrollArea.setWidget(self.verticalLayoutWidget)
+        self.mainLayout.addWidget(self.scrollArea)
+        self.mainLayout.addWidget(self.buttonBox)
 
 
         self.retranslateUi(Dialog)
@@ -243,9 +253,7 @@ class Ui_Dialog(object):
         self.buttonBox.rejected.connect(Dialog.reject)
 
         QMetaObject.connectSlotsByName(Dialog)
-
-        Dialog.adjustSize()
-        Dialog.setFixedSize(Dialog.size())
+        self._fitToScreen(Dialog)
 
     def handleListWidgetDoubleClick(self, item: QListWidgetItem):
         ctr = 0
@@ -255,6 +263,20 @@ class Ui_Dialog(object):
                 print(f'Removed item {item}')
                 break
             ctr = ctr + 1
+
+    def _fitToScreen(self, Dialog: QDialog):
+        max_width = 980
+        max_height = 900
+        screen = Dialog.screen() or QApplication.primaryScreen()
+        if screen:
+            available = screen.availableGeometry()
+            max_width = min(max_width, int(available.width() * 0.92))
+            max_height = min(max_height, int(available.height() * 0.92))
+
+        Dialog.setMinimumSize(500, 560)
+        Dialog.setMaximumSize(max_width, max_height)
+        Dialog.adjustSize()
+        Dialog.resize(min(Dialog.width(), max_width), min(Dialog.height(), max_height))
 
     # setupUi
     def retranslateUi(self, Dialog: QDialog):

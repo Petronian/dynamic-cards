@@ -1,16 +1,18 @@
 # Storing Dialog files.
 
-from aqt.qt import QDialog
+from typing import Optional
+from aqt.qt import QDialog, QWidget, Qt
 from .ui.welcome import Ui_Dialog as WelcomeUI
 from .ui.settings import Ui_Dialog as SettingsUI
 from .config import Settings
 
 class WelcomeDialog(QDialog):
 
-    def __init__(self, show_modal: bool = True):
-        super().__init__()
+    def __init__(self, show_modal: bool = True, parent: Optional[QWidget] = None):
+        super().__init__(parent)
         self.form = WelcomeUI()
         self.form.setupUi(self)
+        self.setWindowModality(Qt.WindowModality.WindowModal)
         self.form.checkBox.setChecked(show_modal)
         
 class SettingsDialog(QDialog):

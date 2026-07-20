@@ -608,12 +608,11 @@ mw.installEventFilter(KeyPressCacheClearFilter(mw))
 
 # Make the welcome announcement if warranted.
 if config.settings.show_modal:
-    dlg = WelcomeDialog(config.settings.show_modal)
+    dlg = WelcomeDialog(config.settings.show_modal, mw)
     def set_show_modal():
         config.settings.show_modal = dlg.form.checkBox.isChecked()
-    qconnect(dlg.rejected, set_show_modal)
-    dlg.setModal(True)
-    dlg.show()
+    qconnect(dlg.finished, set_show_modal)
+    dlg.exec()
 
 # Have the dialog and the settings menu in separate classes.
 sdlg = SettingsDialog(config.settings)

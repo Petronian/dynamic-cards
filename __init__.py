@@ -409,7 +409,8 @@ def reword_note(note: Note, ord: Optional[int] = None, num_retries: Optional[int
     
     # If we've run out of tries, then give up.
     if num_retries < 0:
-        tooltip(f'Could not properly reword note {note.id} using platform {config.settings.platform_index} (reason: {reason}). Please try again.') 
+        if config.debug: print(f'Could not properly reword note {note.id} using platform {config.settings.platform_index} (reason: {reason}). Please try again.')
+        tooltip(f'Error rewording note {note.id}: {str(reason)}. Please try again.') 
         return None
 
     # This is the choke point for the rewording process. If the queue is not running (because the user has killed it),
@@ -430,14 +431,14 @@ def reword_note(note: Note, ord: Optional[int] = None, num_retries: Optional[int
     except RuntimeError as e:
         time.sleep(platform_settings.get("retry_delay_seconds", 1.0)) # avoid rate limit ceiling
         if config.debug: print(f'Failed to reword note {note.id} using platform {config.settings.platform_index} (reason: {str(e)}).')
-        return reword_note(note, num_retries - 1, reason=str(e))
+        return reword_note(note=note, ord=ord, num_retries=num_retries - 1, reason=str(e))
 
     # If the note is cloze-adjacent, then validate it. If valid, return the note.
     # If not cloze-adjacent, skip this validation process and just return the note.
     # BUG: This ONLY goes by name. There must be a better way to validate it.
     if 'cloze' in curr_note_type.lower() and ord is not None and not validate_cloze(reworded_qtext, get_cloze_matches(curr_qtext, ord)):
         time.sleep(platform_settings.get("retry_delay_seconds", 1.0)) # avoid rate limit ceiling
-        return reword_note(note, num_retries - 1, reason='Cloze validation failed')
+        return reword_note(note=note, ord=ord, num_retries=num_retries - 1, reason='Cloze validation failed')
     return reworded_qtext
         
 def reword_text_mistral(curr_qtext: str) -> str: 
@@ -464,7 +465,8 @@ def reword_text_mistral(curr_qtext: str) -> str:
     except Exception as e:
         # Throw an error.
         # # print('Error with Mistral. Is your API key working?')
-        raise RuntimeError(f'Error loading \'{model}\' for dynamic Anki cards: ' + str(e))
+        raise RuntimeError(str(e))
+        # raise RuntimeError(f'Error loading \'{model}\' for dynamic Anki cards: ' + str(e))
                           # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
                           # 'If this continues, disable this add-on to stop these messages.')
 
@@ -502,7 +504,8 @@ def reword_text_gemini(curr_qtext: str) -> str:
     except Exception as e:
         # Throw an error.
         # # print('Error with Gemini. Is your API key working?')
-        raise RuntimeError(f'Error loading \'{model}\' for dynamic Anki cards: ' + str(e))
+        raise RuntimeError(str(e))
+        #raise RuntimeError(f'Error loading \'{model}\' for dynamic Anki cards: ' + str(e))
                           # 'You might need to check your settings to ensure correct model name, API keys, and usage limits. '
                           # 'If this continues, disable this add-on to stop these messages.')
 

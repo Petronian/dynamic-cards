@@ -1,6 +1,6 @@
 {
     "clear_cache_on_reviewer_end": false,
-    "exclude_note_types": [],
+    "exclude_note_types": ["Image Occlusion Enhanced"],
     "platform_configs": [
         {
             "api_key": "",

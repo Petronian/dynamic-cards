@@ -401,7 +401,6 @@ def reword_note(note: Note, ord: Optional[int] = None, num_retries: Optional[int
     platform_index = config.settings.platform_index
     platform_settings = config.settings.platform_configs[platform_index]
     if num_retries is None:
-        tooltip('Warning: Retry count not specified, using default value of 3. See Dynamic Cards settings.')
         num_retries = platform_settings.get("num_retries", 3)
 
     # Extract relevant properties from the card.

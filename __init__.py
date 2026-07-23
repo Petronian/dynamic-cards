@@ -429,7 +429,7 @@ def reword_note(note: Note, ord: Optional[int] = None, num_retries: Optional[int
         else:
             raise RuntimeError(f'Unknown platform index {platform_index} for rewording note {note.id}.')
     except RuntimeError as e:
-        time.sleep(config.settings.retry_delay_seconds) # avoid rate limit ceiling
+        time.sleep(platform_settings.get("retry_delay_seconds", 1.0)) # avoid rate limit ceiling
         if config.debug: print(f'Failed to reword note {note.id} using platform {config.settings.platform_index} (reason: {str(e)}).')
         return reword_note(note, num_retries - 1, reason=str(e))
 

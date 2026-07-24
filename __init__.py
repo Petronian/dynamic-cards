@@ -255,7 +255,7 @@ class KeyPressCacheClearFilter(QObject):
                     tooltip('No note to clear from dynamic cache.')
                 # Fix bug: hitting any cache clear keys should trigger a redraw in case card isn't drawing right
                 if mw.reviewer.card is not None:
-                    mw.reviewer._redraw_current_card()
+                    mw.taskman.run_on_main(mw.reviewer._redraw_current_card)
                 return True
             elif pressed_key == config.settings.shortcut_clear_all_cards:
                 if config.data:
@@ -264,7 +264,7 @@ class KeyPressCacheClearFilter(QObject):
                     tooltip('No dynamic cache to clear.')
                 # Fix bug: hitting any cache clear keys should trigger a redraw in case card isn't drawing right
                 if mw.reviewer.card is not None:
-                    mw.reviewer._redraw_current_card()
+                    mw.taskman.run_on_main(mw.reviewer._redraw_current_card)
                 return True
             elif pressed_key == config.settings.shortcut_pause:
                 config.pause = not config.pause
@@ -608,13 +608,19 @@ def inject_clear_current_card_option(r: Reviewer, m: QMenu) -> None:
     a = m.addAction('Clear current card from cache')
     a.setShortcut(config.settings.shortcut_clear_current_card)
     if mw.reviewer:
-        def fn(): clear_parent_note_of_card_from_cache(mw.reviewer.card)
+        def fn():
+            clear_parent_note_of_card_from_cache(mw.reviewer.card)
+            if mw.reviewer and mw.reviewer.card is not None:
+                mw.taskman.run_on_main(mw.reviewer._redraw_current_card)
         qconnect(a.triggered, fn)
 
 def inject_clear_all_cards_option(r: Reviewer, m: QMenu) -> None:
     a = m.addAction('Clear all cards from cache')
     a.setShortcut(config.settings.shortcut_clear_all_cards)
-    def fn(): clear_cache()
+    def fn():
+        clear_cache()
+        if mw.reviewer and mw.reviewer.card is not None:
+            mw.taskman.run_on_main(mw.reviewer._redraw_current_card)
     qconnect(a.triggered, fn)
     
 def inject_pause_generation_option(r: Reviewer, m: QMenu) -> None:

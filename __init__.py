@@ -379,8 +379,8 @@ def clear_cache():
 def clear_cache_on_editor_load_note(e: Editor):
     if e.editorMode == EditorMode.EDIT_CURRENT:
         clear_note_from_cache(e.note)
-    # if mw.reviewer.card is not None:
-    #     mw.reviewer._redraw_current_card()
+        if mw.reviewer and mw.reviewer.card is not None:
+            mw.taskman.run_on_main(mw.reviewer._redraw_current_card)
 
 # Find all cloze matches of a given ord in a cloze card.
 # Case insensitive.

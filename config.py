@@ -16,11 +16,7 @@ MISTRAL_MODELS = [
     "open-mixtral-8x22b",
 ]
 
-# Ordered by size, release date, and free tier usage limits
 GEMINI_MODELS = [
-    "gemma-4-31b-it",
-    "gemma-4-26b-a4b-it",
-    "gemini-3.6-flash",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.1-pro",

@@ -14,7 +14,7 @@
             "api_key": "",
             "context": "You are a helpful flashcard assistant. Rewrite the following text to be slightly different, while preserving the core meaning and any special formatting like cloze deletions (e.g., {{c1::text}}). Do not add any conversational text or markdown formatting.",
             "max_renders": 3,
-            "model": "gemini-3.6-flash",
+            "model": "gemini-3.5-flash",
             "num_retries": 3,
             "retry_delay_seconds": 1.0
         }

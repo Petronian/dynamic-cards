@@ -15,17 +15,28 @@ MISTRAL_MODELS = [
     "open-mixtral-8x7b",
     "open-mixtral-8x22b",
 ]
+
+# Ordered by size, release date, and free tier usage limits
 GEMINI_MODELS = [
-    "gemini-flash-lite-latest",
-    "gemini-flash-latest",
-    "gemini-pro-latest",
+    "gemma-4-31b",
+    "gemma-4-26b",
+    "gemma-3-27b",
+    "gemma-3-12b",
+    "gemma-3-4b",
+    "gemma-3-2b",
+    "gemma-3-1b",
+    "gemini-3.6-flash",
     "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-pro",
     "gemini-3.1-flash-lite",
-    "gemini-3.1-pro-preview",
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash",
+    "gemini-3-pro",
+    "gemini-3-flash",
     "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
 ]
 
 MODELS = [MISTRAL_MODELS, GEMINI_MODELS]

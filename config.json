@@ -14,15 +14,15 @@
             "api_key": "",
             "context": "You are a helpful flashcard assistant. Rewrite the following text to be slightly different, while preserving the core meaning and any special formatting like cloze deletions (e.g., {{c1::text}}). Do not add any conversational text or markdown formatting.",
             "max_renders": 3,
-            "model": "gemini-flash-latest",
+            "model": "gemini-3.6-flash",
             "num_retries": 3,
             "retry_delay_seconds": 1.0
         }
     ],
     "platform_index": 0,
-    "shortcut_clear_all_cards": "Ctrl+Alt+C",
-    "shortcut_clear_current_card": "Ctrl+C",
-    "shortcut_include_exclude": "Ctrl+E",
-    "shortcut_pause": "Ctrl+P",
+    "shortcut_clear_all_cards": ";",
+    "shortcut_clear_current_card": "'",
+    "shortcut_include_exclude": "L",
+    "shortcut_pause": "P",
     "show_modal": true
 }

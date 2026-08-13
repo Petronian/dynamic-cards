@@ -18,13 +18,8 @@ MISTRAL_MODELS = [
 
 # Ordered by size, release date, and free tier usage limits
 GEMINI_MODELS = [
-    "gemma-4-31b",
-    "gemma-4-26b",
-    "gemma-3-27b",
-    "gemma-3-12b",
-    "gemma-3-4b",
-    "gemma-3-2b",
-    "gemma-3-1b",
+    "gemma-4-31b-it",
+    "gemma-4-26b-a4b-it",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
